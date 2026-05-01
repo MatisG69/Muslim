@@ -1,0 +1,182 @@
+'use client'
+
+import { motion } from 'framer-motion'
+import { BellRing, BookOpen, Circle, MapPin, Volume2 } from 'lucide-react'
+import Link from 'next/link'
+import { useEffect, useMemo, useState } from 'react'
+import { AlarmOverlay } from '@/components/AlarmOverlay'
+import { JumuahBanner } from '@/components/JumuahBanner'
+import { NextPrayerCountdown } from '@/components/NextPrayerCountdown'
+import { PageShell } from '@/components/PageShell'
+import { PrayerTimesCard } from '@/components/PrayerTimesCard'
+import { SunnahCard } from '@/components/SunnahCard'
+import { findCurrentPrayer, findNextPrayer } from '@/lib/api/aladhan'
+import { hijriMonthFr } from '@/lib/api/hijri'
+import {
+  buildAlarmKey,
+  markAlarmTriggered,
+  useFajrAlarmScheduler,
+  wasAlarmTriggered,
+} from '@/lib/hooks/useFajrAlarmScheduler'
+import { useGeolocation } from '@/lib/hooks/useGeolocation'
+import { usePrayerTimes } from '@/lib/hooks/usePrayerTimes'
+import { DEFAULT_SETTINGS, loadSettings, type Settings } from '@/lib/storage/settings'
+import { formatGregorianDate } from '@/lib/utils'
+
+export default function Home() {
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
+  const [alarmOpen, setAlarmOpen] = useState(false)
+
+  useEffect(() => setSettings(loadSettings()), [])
+
+  const geo = useGeolocation(settings.location)
+  const location = settings.location ?? geo.location
+
+  const { data, loading, error } = usePrayerTimes({
+    location,
+    method: settings.method,
+    madhab: settings.madhab,
+    customFajrAngle: settings.customFajrAngle,
+    customIshaAngle: settings.customIshaAngle,
+  })
+
+  const next = useMemo(() => (data ? findNextPrayer(data.timings) : null), [data])
+  const current = useMemo(() => (data ? findCurrentPrayer(data.timings) : null), [data])
+
+  useFajrAlarmScheduler({
+    enabled: settings.fajrAlarmEnabled,
+    fajrTime: data?.timings.Fajr,
+    offsetMinutes: settings.fajrAlarmOffsetMin,
+    onTrigger: () => {
+      if (!data) return
+      const key = buildAlarmKey(data.timings.Fajr)
+      if (wasAlarmTriggered(key)) return
+      markAlarmTriggered(key)
+      setAlarmOpen(true)
+    },
+  })
+
+  return (
+    <PageShell>
+      <header className='flex items-start justify-between'>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}>
+          <p className='font-arabic text-2xl text-gold-300/80' dir='rtl'>السلام عليكم</p>
+          <p className='mt-1 text-xs uppercase tracking-[0.3em] text-ivory-100/50'>Sajda</p>
+        </motion.div>
+        {data && (
+          <div className='text-right'>
+            <p className='font-serif text-base text-ivory-50/95'>
+              {data.hijriDay} {hijriMonthFr(data.hijriMonth)}
+            </p>
+            <p className='font-arabic text-xs text-gold-300/70' dir='rtl'>
+              {data.hijriYear} هـ
+            </p>
+          </div>
+        )}
+      </header>
+
+      {data && (
+        <div className='-mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center'>
+          <p className='text-xs uppercase tracking-[0.25em] text-ivory-100/50'>
+            {formatGregorianDate(new Date())}
+          </p>
+          {location && (
+            <span className='inline-flex items-center gap-1 text-xs text-ivory-100/60'>
+              <MapPin className='h-3 w-3 text-gold-400/80' />
+              {location.city ?? `${location.latitude.toFixed(2)}°, ${location.longitude.toFixed(2)}°`}
+            </span>
+          )}
+        </div>
+      )}
+
+      {settings.jumuahReminderEnabled && <JumuahBanner enabled />}
+
+      {loading && !data && <Skeleton />}
+      {error && (
+        <div className='card px-6 py-5 text-sm text-rose-300/90'>
+          Impossible de charger les horaires. {error}
+        </div>
+      )}
+      {!location && geo.status === 'denied' && (
+        <div className='card px-6 py-5 text-sm text-ivory-100/80'>
+          La localisation est refusée. Activez-la depuis votre navigateur ou
+          <Link href='/settings' className='ml-1 text-gold-300 underline'>
+            saisissez une ville
+          </Link>
+          .
+        </div>
+      )}
+
+      {data && next && (
+        <NextPrayerCountdown
+          name={next.name}
+          time={data.timings[next.name]}
+          target={next.date}
+          isTomorrow={next.isTomorrow}
+        />
+      )}
+
+      {data && next && (
+        <PrayerTimesCard timings={data.timings} current={current} next={next.name} />
+      )}
+
+      {settings.sunnahDailyEnabled && <SunnahCard />}
+
+      <section className='grid grid-cols-2 gap-3'>
+        <Link href='/quran' className='card group flex flex-col gap-2 px-4 py-4 transition-colors hover:bg-white/[0.04]'>
+          <BookOpen className='h-5 w-5 text-gold-300' />
+          <div>
+            <p className='font-serif text-lg text-ivory-50'>Le Coran</p>
+            <p className='text-[11px] text-ivory-100/50'>114 sourates · arabe + traduction</p>
+          </div>
+        </Link>
+        <Link href='/tasbih' className='card group flex flex-col gap-2 px-4 py-4 transition-colors hover:bg-white/[0.04]'>
+          <Circle className='h-5 w-5 text-gold-300' />
+          <div>
+            <p className='font-serif text-lg text-ivory-50'>Tasbih</p>
+            <p className='text-[11px] text-ivory-100/50'>Compteur de dhikr</p>
+          </div>
+        </Link>
+      </section>
+
+      <section className='card flex items-center justify-between gap-4 px-5 py-4'>
+        <div className='flex items-center gap-3'>
+          <div className='flex h-10 w-10 items-center justify-center rounded-full bg-gold-400/10 ring-1 ring-gold-400/30'>
+            <BellRing className='h-4 w-4 text-gold-300' />
+          </div>
+          <div>
+            <p className='text-sm text-ivory-50'>Alarme Fajr</p>
+            <p className='text-xs text-ivory-100/60'>
+              {settings.fajrAlarmEnabled ? 'Photo du tapis requise' : 'Désactivée'}
+            </p>
+          </div>
+        </div>
+        <button type='button' onClick={() => setAlarmOpen(true)} className='btn-ghost text-xs'>
+          <Volume2 className='h-3.5 w-3.5' />
+          Tester
+        </button>
+      </section>
+
+      <footer className='mt-2 pt-4 text-center'>
+        <div className='divider-ornate mb-4' />
+        <p className='font-arabic text-base text-gold-300/60' dir='rtl'>
+          إن الصلاة تنهى عن الفحشاء والمنكر
+        </p>
+      </footer>
+
+      <AlarmOverlay
+        open={alarmOpen}
+        adhanSrc='/Adhan.mp3'
+        volume={settings.adhanVolume}
+        onDismiss={() => setAlarmOpen(false)}
+      />
+    </PageShell>
+  )
+}
+
+const Skeleton = () => (
+  <div className='space-y-4'>
+    <div className='h-48 animate-pulse rounded-3xl bg-white/[0.03]' />
+    <div className='h-72 animate-pulse rounded-3xl bg-white/[0.03]' />
+  </div>
+)

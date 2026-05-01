@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a1410;
+  --bg-soft: #101c17;
+  --emerald: #0f3a2e;
+  --gold: #d4a957;
+  --ivory: #f5efe6;
+  --ink: #0a1410;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ivory);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-feature-settings: 'ss01', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-image:
+    radial-gradient(ellipse at top, rgba(15, 58, 46, 0.5) 0%, transparent 60%),
+    radial-gradient(ellipse at bottom, rgba(212, 169, 87, 0.06) 0%, transparent 50%),
+    linear-gradient(180deg, #0a1410 0%, #0a1410 100%);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06];
+  }
+
+  .glass-gold {
+    @apply bg-gold-400/[0.04] backdrop-blur-xl border border-gold-400/[0.18];
+  }
+
+  .text-gold-shimmer {
+    background: linear-gradient(
+      90deg,
+      #d4a957 0%,
+      #f6ecd0 50%,
+      #d4a957 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 4s linear infinite;
+  }
+
+  .divider-ornate {
+    position: relative;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(212, 169, 87, 0.4) 50%,
+      transparent 100%
+    );
+  }
+
+  .divider-ornate::before {
+    content: '✦';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg);
+    color: var(--gold);
+    padding: 0 12px;
+    font-size: 10px;
+  }
+
+  .btn-primary {
+    @apply relative inline-flex items-center justify-center gap-2 rounded-full px-6 py-3
+           bg-gradient-to-b from-gold-300 to-gold-500 text-ink-900 font-medium
+           shadow-[0_8px_30px_-8px_rgba(212,169,87,0.5)]
+           hover:from-gold-200 hover:to-gold-400 transition-all
+           active:scale-[0.98];
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5
+           border border-white/10 text-ivory-100/80 hover:text-ivory-100
+           hover:bg-white/5 transition-all;
+  }
+
+  .card {
+    @apply relative rounded-3xl bg-gradient-to-b from-white/[0.04] to-white/[0.01]
+           border border-white/[0.06] backdrop-blur-xl
+           shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)];
+  }
+
+  .card-prayer-active {
+    @apply relative rounded-3xl
+           bg-gradient-to-br from-gold-400/[0.12] via-emerald-900/30 to-emerald-950/40
+           border border-gold-400/40
+           shadow-[0_24px_60px_-12px_rgba(212,169,87,0.25)];
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+.alarm-pulse {
+  animation: breathe 2.5s ease-in-out infinite;
+}
+
+::selection {
+  background: rgba(212, 169, 87, 0.3);
+  color: var(--ivory);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(212, 169, 87, 0.2);
+  border-radius: 4px;
+}

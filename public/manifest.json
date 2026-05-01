@@ -1,0 +1,18 @@
+{
+  "name": "Sajda — Compagnon de prière",
+  "short_name": "Sajda",
+  "description": "Horaires de prière et alarme Fajr qui ne s'arrête qu'avec une photo de votre tapis.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a1410",
+  "theme_color": "#0f3a2e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

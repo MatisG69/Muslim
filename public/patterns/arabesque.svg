@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+  <defs>
+    <pattern id="islamic" x="0" y="0" width="120" height="120" patternUnits="userSpaceOnUse">
+      <g fill="none" stroke="#d4a957" stroke-width="0.6" opacity="0.18">
+        <path d="M60 10 L80 30 L60 50 L40 30 Z" />
+        <path d="M60 70 L80 90 L60 110 L40 90 Z" />
+        <path d="M10 60 L30 40 L50 60 L30 80 Z" />
+        <path d="M70 60 L90 40 L110 60 L90 80 Z" />
+        <circle cx="60" cy="60" r="14" />
+        <circle cx="60" cy="60" r="8" />
+        <path d="M46 60 L74 60 M60 46 L60 74 M50 50 L70 70 M70 50 L50 70" />
+        <path d="M0 0 L20 20 M120 0 L100 20 M0 120 L20 100 M120 120 L100 100" />
+      </g>
+    </pattern>
+  </defs>
+  <rect width="120" height="120" fill="url(#islamic)" />
+</svg>
