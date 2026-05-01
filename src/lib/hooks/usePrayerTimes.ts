@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { DailyTimings, Location, Madhab } from '@/types/prayer'
 import { fetchDailyTimings } from '@/lib/api/aladhan'
+import type { PrayerTune } from '@/lib/storage/settings'
 
 type Args = {
   location: Location | null
@@ -10,6 +11,7 @@ type Args = {
   madhab: Madhab
   customFajrAngle?: number
   customIshaAngle?: number
+  tune?: PrayerTune
 }
 
 type State = {
@@ -24,14 +26,23 @@ export const usePrayerTimes = ({
   madhab,
   customFajrAngle,
   customIshaAngle,
+  tune,
 }: Args): State => {
   const [state, setState] = useState<State>({ data: null, loading: false, error: null })
+
+  const tuneKey = useMemo(
+    () =>
+      tune
+        ? `${tune.fajr},${tune.sunrise},${tune.dhuhr},${tune.asr},${tune.maghrib},${tune.isha}`
+        : '',
+    [tune?.fajr, tune?.sunrise, tune?.dhuhr, tune?.asr, tune?.maghrib, tune?.isha],
+  )
 
   useEffect(() => {
     if (!location) return
     let cancelled = false
     setState(s => ({ ...s, loading: true, error: null }))
-    fetchDailyTimings({ location, method, madhab, customFajrAngle, customIshaAngle })
+    fetchDailyTimings({ location, method, madhab, customFajrAngle, customIshaAngle, tune })
       .then(data => {
         if (!cancelled) setState({ data, loading: false, error: null })
       })
@@ -41,7 +52,15 @@ export const usePrayerTimes = ({
     return () => {
       cancelled = true
     }
-  }, [location?.latitude, location?.longitude, method, madhab, customFajrAngle, customIshaAngle])
+  }, [
+    location?.latitude,
+    location?.longitude,
+    method,
+    madhab,
+    customFajrAngle,
+    customIshaAngle,
+    tuneKey,
+  ])
 
   return state
 }

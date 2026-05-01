@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { BellRing, BookOpen, Circle, MapPin, Volume2 } from 'lucide-react'
+import { BellRing, BookOpen, Circle, Lock, MapPin, Mic, Volume2 } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { AlarmOverlay } from '@/components/AlarmOverlay'
@@ -38,6 +38,7 @@ export default function Home() {
     madhab: settings.madhab,
     customFajrAngle: settings.customFajrAngle,
     customIshaAngle: settings.customIshaAngle,
+    tune: settings.tune,
   })
 
   const next = useMemo(() => (data ? findNextPrayer(data.timings) : null), [data])
@@ -123,6 +124,29 @@ export default function Home() {
       {settings.sunnahDailyEnabled && <SunnahCard />}
 
       <section className='grid grid-cols-2 gap-3'>
+        <Link
+          href='/recitation'
+          className='card relative col-span-2 flex items-center gap-4 overflow-hidden px-5 py-5 opacity-70 transition-colors hover:bg-white/[0.03]'
+        >
+          <div
+            className='pointer-events-none absolute inset-0 opacity-[0.04]'
+            style={{ backgroundImage: 'url(/patterns/arabesque.svg)', backgroundSize: '160px' }}
+            aria-hidden
+          />
+          <div className='relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.02]'>
+            <Mic className='h-5 w-5 text-ivory-100/40' />
+            <span className='absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-gold-400/40 bg-ink-900'>
+              <Lock className='h-2.5 w-2.5 text-gold-300' />
+            </span>
+          </div>
+          <div className='relative flex-1'>
+            <p className='text-[10px] uppercase tracking-[0.3em] text-gold-300/70'>À venir</p>
+            <p className='font-serif text-lg text-ivory-50/80'>Récitation guidée par IA</p>
+            <p className='text-[11px] text-ivory-100/50'>
+              Détection automatique de sourate · suivi mot-à-mot
+            </p>
+          </div>
+        </Link>
         <Link href='/quran' className='card group flex flex-col gap-2 px-4 py-4 transition-colors hover:bg-white/[0.04]'>
           <BookOpen className='h-5 w-5 text-gold-300' />
           <div>

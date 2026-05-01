@@ -1,11 +1,17 @@
 'use client'
 
-import { ChevronLeft, MapPin } from 'lucide-react'
+import { ChevronLeft, MapPin, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { PageShell } from '@/components/PageShell'
 import { reverseGeocode } from '@/lib/api/aladhan'
-import { DEFAULT_SETTINGS, loadSettings, saveSettings, type Settings } from '@/lib/storage/settings'
+import {
+  DEFAULT_SETTINGS,
+  DEFAULT_TUNE,
+  loadSettings,
+  saveSettings,
+  type Settings,
+} from '@/lib/storage/settings'
 import { CALCULATION_METHODS, MADHAB_LABELS, type Madhab } from '@/types/prayer'
 
 export default function SettingsPage() {
@@ -165,6 +171,55 @@ export default function SettingsPage() {
           </div>
         </Section>
       )}
+
+      <Section
+        title='Ajustement par prière'
+        subtitle='Décalez chaque horaire en minutes pour matcher exactement votre mosquée'
+      >
+        <div className='space-y-4'>
+          <TuneSlider
+            label='Fajr'
+            value={s.tune.fajr}
+            onChange={v => update('tune', { ...s.tune, fajr: v })}
+          />
+          <TuneSlider
+            label='Lever du soleil'
+            value={s.tune.sunrise}
+            onChange={v => update('tune', { ...s.tune, sunrise: v })}
+          />
+          <TuneSlider
+            label='Dhuhr'
+            value={s.tune.dhuhr}
+            onChange={v => update('tune', { ...s.tune, dhuhr: v })}
+          />
+          <TuneSlider
+            label='Asr'
+            value={s.tune.asr}
+            onChange={v => update('tune', { ...s.tune, asr: v })}
+          />
+          <TuneSlider
+            label='Maghrib'
+            value={s.tune.maghrib}
+            onChange={v => update('tune', { ...s.tune, maghrib: v })}
+          />
+          <TuneSlider
+            label='Isha'
+            value={s.tune.isha}
+            onChange={v => update('tune', { ...s.tune, isha: v })}
+          />
+          <button
+            onClick={() => update('tune', DEFAULT_TUNE)}
+            className='btn-ghost w-full justify-center text-xs'
+          >
+            <RotateCcw className='h-3.5 w-3.5' />
+            Réinitialiser tous les ajustements
+          </button>
+          <p className='text-[11px] text-ivory-100/50'>
+            Conseil : comparez avec les horaires de votre mosquée puis ajustez chaque prière
+            de ±1 à ±5 minutes pour aligner exactement.
+          </p>
+        </div>
+      </Section>
 
       <Section title='École juridique (madhab)' subtitle='Détermine le début de l’Asr'>
         <div className='grid grid-cols-2 gap-2'>
@@ -330,6 +385,35 @@ const AngleSlider = ({
       min={min}
       max={max}
       step={step}
+      value={value}
+      onChange={e => onChange(Number(e.target.value))}
+      className='mt-2 w-full accent-gold-400'
+    />
+  </div>
+)
+
+const TuneSlider = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: number
+  onChange: (v: number) => void
+}) => (
+  <div>
+    <div className='flex items-center justify-between text-sm text-ivory-100/80'>
+      <span>{label}</span>
+      <span className='font-serif text-lg text-gold-300 tabular-nums'>
+        {value > 0 ? '+' : ''}
+        {value} min
+      </span>
+    </div>
+    <input
+      type='range'
+      min={-15}
+      max={15}
+      step={1}
       value={value}
       onChange={e => onChange(Number(e.target.value))}
       className='mt-2 w-full accent-gold-400'

@@ -77,3 +77,42 @@ export const fetchSurahDetail = async (surah: number): Promise<SurahDetail> => {
     transliteration: transliteration.ayahs,
   }
 }
+
+export type QuranSurah = {
+  number: number
+  name: string
+  englishName: string
+  englishNameTranslation: string
+  numberOfAyahs: number
+  ayahs: Ayah[]
+}
+
+export type EntireQuran = QuranSurah[]
+
+let entireQuranCache: EntireQuran | null = null
+
+export const fetchEntireQuran = async (): Promise<EntireQuran> => {
+  if (entireQuranCache) return entireQuranCache
+  const res = await fetch(`${BASE}/quran/quran-uthmani`, {
+    next: { revalidate: 60 * 60 * 24 * 365 },
+  })
+  if (!res.ok) throw new Error(`Quran ${res.status}`)
+  const json = await res.json()
+  const data = json.data
+  const surahs: EntireQuran = (data.surahs as Array<Record<string, any>>).map(s => ({
+    number: s.number,
+    name: s.name,
+    englishName: s.englishName,
+    englishNameTranslation: s.englishNameTranslation,
+    numberOfAyahs: s.numberOfAyahs,
+    ayahs: (s.ayahs as Array<Record<string, any>>).map(a => ({
+      number: a.number,
+      numberInSurah: a.numberInSurah,
+      text: a.text,
+      juz: a.juz,
+      page: a.page,
+    })),
+  }))
+  entireQuranCache = surahs
+  return surahs
+}

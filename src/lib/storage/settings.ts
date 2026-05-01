@@ -1,6 +1,15 @@
 import type { Location, Madhab } from '@/types/prayer'
 
-const KEY = 'sajda.settings.v2'
+const KEY = 'sajda.settings.v4'
+
+export type PrayerTune = {
+  fajr: number
+  sunrise: number
+  dhuhr: number
+  asr: number
+  maghrib: number
+  isha: number
+}
 
 export type Settings = {
   location: Location | null
@@ -8,6 +17,7 @@ export type Settings = {
   madhab: Madhab
   customFajrAngle: number
   customIshaAngle: number
+  tune: PrayerTune
   fajrAlarmEnabled: boolean
   fajrAlarmOffsetMin: number
   adhanVolume: number
@@ -15,12 +25,22 @@ export type Settings = {
   sunnahDailyEnabled: boolean
 }
 
+export const DEFAULT_TUNE: PrayerTune = {
+  fajr: 0,
+  sunrise: 0,
+  dhuhr: 0,
+  asr: 0,
+  maghrib: 0,
+  isha: 0,
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   location: null,
-  method: 12,
+  method: 2,
   madhab: 'maliki',
-  customFajrAngle: 18,
-  customIshaAngle: 17,
+  customFajrAngle: 15,
+  customIshaAngle: 15,
+  tune: DEFAULT_TUNE,
   fajrAlarmEnabled: true,
   fajrAlarmOffsetMin: 0,
   adhanVolume: 1,
@@ -33,7 +53,12 @@ export const loadSettings = (): Settings => {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return DEFAULT_SETTINGS
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) }
+    const parsed = JSON.parse(raw) as Partial<Settings>
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      tune: { ...DEFAULT_TUNE, ...(parsed.tune ?? {}) },
+    }
   } catch {
     return DEFAULT_SETTINGS
   }

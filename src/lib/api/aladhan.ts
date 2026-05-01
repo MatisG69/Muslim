@@ -1,4 +1,5 @@
 import { isHanafiSchool, type DailyTimings, type Location, type Madhab, type PrayerName, type PrayerTimes } from '@/types/prayer'
+import type { PrayerTune } from '@/lib/storage/settings'
 
 const BASE = 'https://api.aladhan.com/v1'
 
@@ -20,6 +21,17 @@ type FetchOptions = {
   madhab: Madhab
   customFajrAngle?: number
   customIshaAngle?: number
+  tune?: PrayerTune
+}
+
+const buildTuneParam = (tune: PrayerTune): string => {
+  // AlAdhan tune order: Imsak, Fajr, Sunrise, Dhuhr, Asr, Sunset, Maghrib, Isha, Midnight
+  return [0, tune.fajr, tune.sunrise, tune.dhuhr, tune.asr, 0, tune.maghrib, tune.isha, 0].join(',')
+}
+
+const hasTune = (tune?: PrayerTune): boolean => {
+  if (!tune) return false
+  return Object.values(tune).some(v => v !== 0)
 }
 
 const buildTimingsUrl = (path: string, opts: FetchOptions): string => {
@@ -33,6 +45,9 @@ const buildTimingsUrl = (path: string, opts: FetchOptions): string => {
       'methodSettings',
       `${opts.customFajrAngle},null,${opts.customIshaAngle}`,
     )
+  }
+  if (hasTune(opts.tune)) {
+    url.searchParams.set('tune', buildTuneParam(opts.tune!))
   }
   return url.toString()
 }
