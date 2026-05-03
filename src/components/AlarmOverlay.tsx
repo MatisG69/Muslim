@@ -20,9 +20,14 @@ type Props = {
   adhanSrc: string
   volume: number
   onDismiss: () => void
+  qiblaOverlay?: {
+    qiblaBearing: number
+    deviceHeading: number | null
+    onActivate?: () => void
+  }
 }
 
-export const AlarmOverlay = ({ open, adhanSrc, volume, onDismiss }: Props) => {
+export const AlarmOverlay = ({ open, adhanSrc, volume, onDismiss, qiblaOverlay }: Props) => {
   const playerRef = useRef<AdhanPlayer | null>(null)
   const [phase, setPhase] = useState<Phase>('arming')
   const [lastReason, setLastReason] = useState<string | null>(null)
@@ -92,7 +97,7 @@ export const AlarmOverlay = ({ open, adhanSrc, volume, onDismiss }: Props) => {
 
         <div className='relative mx-auto flex min-h-dvh max-w-md flex-col px-6 py-10'>
           {phase === 'arming' && <ArmView onArm={arm} />}
-          {phase === 'ringing' && <RingView onCapture={handleCapture} />}
+          {phase === 'ringing' && <RingView onCapture={handleCapture} qiblaOverlay={qiblaOverlay} />}
           {phase === 'verifying' && <VerifyingView />}
           {phase === 'rejected' && (
             <RejectedView reason={lastReason ?? ''} onRetry={() => setPhase('ringing')} />
@@ -130,7 +135,13 @@ const ArmView = ({ onArm }: { onArm: () => void }) => (
   </div>
 )
 
-const RingView = ({ onCapture }: { onCapture: (d: string) => void }) => (
+const RingView = ({
+  onCapture,
+  qiblaOverlay,
+}: {
+  onCapture: (d: string) => void
+  qiblaOverlay?: Props['qiblaOverlay']
+}) => (
   <div className='flex flex-col gap-6'>
     <div className='flex flex-col items-center pt-4 text-center'>
       <div className='relative'>
@@ -141,10 +152,10 @@ const RingView = ({ onCapture }: { onCapture: (d: string) => void }) => (
       </div>
       <h1 className='mt-5 font-serif text-3xl text-ivory-50'>Adhan en cours</h1>
       <p className='mt-1 text-sm text-ivory-100/70'>
-        Photographiez votre tapis de prière pour arrêter
+        Posez le téléphone pieds face à la Qibla, puis photographiez votre tapis
       </p>
     </div>
-    <CameraCapture onCapture={onCapture} />
+    <CameraCapture onCapture={onCapture} qiblaOverlay={qiblaOverlay} />
     <p className='mx-auto mt-2 max-w-xs text-center text-[11px] text-ivory-100/40'>
       Mur, sol nu, visage : refusés. Le tapis doit être clairement visible.
     </p>

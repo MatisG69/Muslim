@@ -6,9 +6,14 @@ import { useEffect, useRef, useState } from 'react'
 type Props = {
   onCapture: (dataUrl: string) => void
   disabled?: boolean
+  qiblaOverlay?: {
+    qiblaBearing: number
+    deviceHeading: number | null
+    onActivate?: () => void
+  }
 }
 
-export const CameraCapture = ({ onCapture, disabled }: Props) => {
+export const CameraCapture = ({ onCapture, disabled, qiblaOverlay }: Props) => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +79,7 @@ export const CameraCapture = ({ onCapture, disabled }: Props) => {
             />
             <div className='pointer-events-none absolute inset-0 ring-1 ring-inset ring-gold-400/20' />
             <div className='pointer-events-none absolute inset-4 rounded-2xl border-2 border-dashed border-gold-300/30' />
+            {qiblaOverlay && <QiblaOverlay {...qiblaOverlay} />}
           </>
         )}
       </div>
@@ -98,5 +104,74 @@ export const CameraCapture = ({ onCapture, disabled }: Props) => {
         </button>
       </div>
     </div>
+  )
+}
+
+const QiblaOverlay = ({
+  qiblaBearing,
+  deviceHeading,
+  onActivate,
+}: {
+  qiblaBearing: number
+  deviceHeading: number | null
+  onActivate?: () => void
+}) => {
+  const heading = deviceHeading ?? 0
+  const angleDelta = ((qiblaBearing - heading + 540) % 360) - 180
+  const aligned = Math.abs(angleDelta) < 10
+  const arrowRotation = qiblaBearing - heading
+
+  if (deviceHeading == null) {
+    return (
+      <button
+        type='button'
+        onClick={onActivate}
+        className='absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-ink-900/85 px-3 py-1.5 text-[10px] uppercase tracking-widest text-gold-300 backdrop-blur-sm'
+      >
+        Activer la boussole
+      </button>
+    )
+  }
+
+  return (
+    <>
+      <div
+        className={`absolute left-1/2 top-3 -translate-x-1/2 rounded-full px-3 py-1 text-[10px] uppercase tracking-widest backdrop-blur-md ${
+          aligned ? 'bg-emerald-500/30 text-emerald-200' : 'bg-ink-900/70 text-gold-300/90'
+        }`}
+      >
+        {aligned ? '✓ Face à la Qibla' : `${Math.round(Math.abs(angleDelta))}° ${angleDelta > 0 ? 'à droite' : 'à gauche'}`}
+      </div>
+      <svg
+        viewBox='0 0 100 100'
+        className='pointer-events-none absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2'
+      >
+        <circle cx='50' cy='50' r='32' fill='none' stroke={aligned ? 'rgba(52,211,153,0.5)' : 'rgba(212,169,87,0.4)'} strokeWidth='1' />
+        <g
+          style={{
+            transform: `rotate(${arrowRotation}deg)`,
+            transformOrigin: '50px 50px',
+            transition: 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
+        >
+          <path
+            d='M 50 16 L 56 32 L 50 28 L 44 32 Z'
+            fill={aligned ? '#34d399' : '#d4a957'}
+            stroke={aligned ? '#34d399' : '#d4a957'}
+            strokeWidth='0.5'
+          />
+          <line
+            x1='50'
+            y1='32'
+            x2='50'
+            y2='50'
+            stroke={aligned ? '#34d399' : '#d4a957'}
+            strokeWidth='1'
+            opacity='0.6'
+          />
+        </g>
+        <circle cx='50' cy='50' r='3' fill={aligned ? '#34d399' : '#d4a957'} />
+      </svg>
+    </>
   )
 }

@@ -14,9 +14,13 @@ type Props = {
   timings: PrayerTimes
   current: PrayerName | null
   next: PrayerName
+  ishaEnd?: Date | null
 }
 
-export const PrayerTimesCard = ({ timings, current, next }: Props) => {
+const formatHm = (d: Date): string =>
+  `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+
+export const PrayerTimesCard = ({ timings, current, next, ishaEnd }: Props) => {
   return (
     <motion.section
       initial={{ opacity: 0, y: 12 }}
@@ -60,6 +64,11 @@ export const PrayerTimesCard = ({ timings, current, next }: Props) => {
                 <span className='font-arabic text-sm text-ivory-100/40' dir='rtl'>
                   {PRAYER_LABELS_AR[name]}
                 </span>
+                {name === 'Isha' && ishaEnd && (
+                  <span className='mt-1 text-[10px] uppercase tracking-widest text-gold-300/70'>
+                    Fin du temps · {formatHm(ishaEnd)}
+                  </span>
+                )}
               </div>
               <div className='flex items-center gap-3'>
                 {isNext && !isCurrent && (

@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { BellRing, BookOpen, Circle, Lock, MapPin, Mic, Volume2 } from 'lucide-react'
+import { BellRing, BookOpen, CalendarCheck, Circle, Compass, Droplets, Lock, MapPin, Mic, Volume2 } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { AlarmOverlay } from '@/components/AlarmOverlay'
@@ -9,9 +9,11 @@ import { JumuahBanner } from '@/components/JumuahBanner'
 import { NextPrayerCountdown } from '@/components/NextPrayerCountdown'
 import { PageShell } from '@/components/PageShell'
 import { PrayerTimesCard } from '@/components/PrayerTimesCard'
+import { QiblaCompass } from '@/components/QiblaCompass'
 import { SunnahCard } from '@/components/SunnahCard'
 import { findCurrentPrayer, findNextPrayer } from '@/lib/api/aladhan'
 import { hijriMonthFr } from '@/lib/api/hijri'
+import { useDeviceHeading } from '@/lib/hooks/useDeviceHeading'
 import {
   buildAlarmKey,
   markAlarmTriggered,
@@ -19,7 +21,12 @@ import {
   wasAlarmTriggered,
 } from '@/lib/hooks/useFajrAlarmScheduler'
 import { useGeolocation } from '@/lib/hooks/useGeolocation'
+import {
+  useFajrPrayerNotification,
+  useWeeklyPlannerNotification,
+} from '@/lib/hooks/useLocalNotifications'
 import { usePrayerTimes } from '@/lib/hooks/usePrayerTimes'
+import { computeQiblaBearing } from '@/lib/qibla'
 import { DEFAULT_SETTINGS, loadSettings, type Settings } from '@/lib/storage/settings'
 import { formatGregorianDate } from '@/lib/utils'
 
@@ -32,7 +39,7 @@ export default function Home() {
   const geo = useGeolocation(settings.location)
   const location = settings.location ?? geo.location
 
-  const { data, loading, error } = usePrayerTimes({
+  const { data, ishaEnd, loading, error } = usePrayerTimes({
     location,
     method: settings.method,
     madhab: settings.madhab,
@@ -44,10 +51,17 @@ export default function Home() {
   const next = useMemo(() => (data ? findNextPrayer(data.timings) : null), [data])
   const current = useMemo(() => (data ? findCurrentPrayer(data.timings) : null), [data])
 
+  const heading = useDeviceHeading()
+  const qiblaBearing = useMemo(
+    () => (location ? computeQiblaBearing(location.latitude, location.longitude) : null),
+    [location?.latitude, location?.longitude],
+  )
+
   useFajrAlarmScheduler({
     enabled: settings.fajrAlarmEnabled,
     fajrTime: data?.timings.Fajr,
     offsetMinutes: settings.fajrAlarmOffsetMin,
+    days: settings.fajrAlarmDays,
     onTrigger: () => {
       if (!data) return
       const key = buildAlarmKey(data.timings.Fajr)
@@ -56,6 +70,9 @@ export default function Home() {
       setAlarmOpen(true)
     },
   })
+
+  useFajrPrayerNotification(settings.fajrAlarmEnabled, data?.timings.Fajr)
+  useWeeklyPlannerNotification(settings.weeklyPlannerNotifEnabled)
 
   return (
     <PageShell>
@@ -118,12 +135,87 @@ export default function Home() {
       )}
 
       {data && next && (
-        <PrayerTimesCard timings={data.timings} current={current} next={next.name} />
+        <PrayerTimesCard timings={data.timings} current={current} next={next.name} ishaEnd={ishaEnd} />
+      )}
+
+      {qiblaBearing != null && (
+        <Link
+          href='/qibla'
+          className='card flex items-center gap-4 px-5 py-4 transition-colors hover:bg-white/[0.04]'
+        >
+          <div className='shrink-0'>
+            <QiblaCompass
+              qiblaBearing={qiblaBearing}
+              deviceHeading={heading.heading}
+              size={88}
+              showLabels={false}
+            />
+          </div>
+          <div className='flex-1'>
+            <p className='text-[10px] uppercase tracking-[0.3em] text-gold-300/70'>Direction Qibla</p>
+            <p className='mt-1 font-serif text-lg text-ivory-50'>{Math.round(qiblaBearing)}°</p>
+            {heading.status !== 'granted' ? (
+              <button
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  void heading.request()
+                }}
+                className='mt-1 text-[11px] text-gold-300 underline'
+              >
+                Activer la boussole
+              </button>
+            ) : (
+              <p className='text-[11px] text-ivory-100/50'>Touchez pour la vue complète</p>
+            )}
+          </div>
+          <Compass className='h-5 w-5 shrink-0 text-gold-300' />
+        </Link>
       )}
 
       {settings.sunnahDailyEnabled && <SunnahCard />}
 
       <section className='grid grid-cols-2 gap-3'>
+        <Link href='/quran' className='card group flex flex-col gap-2 px-4 py-4 transition-colors hover:bg-white/[0.04]'>
+          <BookOpen className='h-5 w-5 text-gold-300' />
+          <div>
+            <p className='font-serif text-lg text-ivory-50'>Le Coran</p>
+            <p className='text-[11px] text-ivory-100/50'>Audio · plage · mode mushaf</p>
+          </div>
+        </Link>
+        <Link href='/tasbih' className='card group flex flex-col gap-2 px-4 py-4 transition-colors hover:bg-white/[0.04]'>
+          <Circle className='h-5 w-5 text-gold-300' />
+          <div>
+            <p className='font-serif text-lg text-ivory-50'>Tasbih</p>
+            <p className='text-[11px] text-ivory-100/50'>Compteur de dhikr</p>
+          </div>
+        </Link>
+        <Link href='/qibla' className='card group flex flex-col gap-2 px-4 py-4 transition-colors hover:bg-white/[0.04]'>
+          <Compass className='h-5 w-5 text-gold-300' />
+          <div>
+            <p className='font-serif text-lg text-ivory-50'>Qibla</p>
+            <p className='text-[11px] text-ivory-100/50'>Boussole vers la Mecque</p>
+          </div>
+        </Link>
+        <Link href='/ablutions' className='card group flex flex-col gap-2 px-4 py-4 transition-colors hover:bg-white/[0.04]'>
+          <Droplets className='h-5 w-5 text-gold-300' />
+          <div>
+            <p className='font-serif text-lg text-ivory-50'>Ablutions</p>
+            <p className='text-[11px] text-ivory-100/50'>Guide étape par étape</p>
+          </div>
+        </Link>
+        <Link href='/planner' className='card group col-span-2 flex items-center gap-4 px-5 py-4 transition-colors hover:bg-white/[0.04]'>
+          <div className='flex h-10 w-10 items-center justify-center rounded-full bg-gold-400/10 ring-1 ring-gold-400/30'>
+            <CalendarCheck className='h-4 w-4 text-gold-300' />
+          </div>
+          <div className='flex-1'>
+            <p className='font-serif text-lg text-ivory-50'>Planning de la semaine</p>
+            <p className='text-[11px] text-ivory-100/55'>
+              Choisis les jours où l'alarme Fajr sonnera
+            </p>
+          </div>
+          <span className='text-gold-300'>→</span>
+        </Link>
         <Link
           href='/recitation'
           className='card relative col-span-2 flex items-center gap-4 overflow-hidden px-5 py-5 opacity-70 transition-colors hover:bg-white/[0.03]'
@@ -145,20 +237,6 @@ export default function Home() {
             <p className='text-[11px] text-ivory-100/50'>
               Détection automatique de sourate · suivi mot-à-mot
             </p>
-          </div>
-        </Link>
-        <Link href='/quran' className='card group flex flex-col gap-2 px-4 py-4 transition-colors hover:bg-white/[0.04]'>
-          <BookOpen className='h-5 w-5 text-gold-300' />
-          <div>
-            <p className='font-serif text-lg text-ivory-50'>Le Coran</p>
-            <p className='text-[11px] text-ivory-100/50'>114 sourates · arabe + traduction</p>
-          </div>
-        </Link>
-        <Link href='/tasbih' className='card group flex flex-col gap-2 px-4 py-4 transition-colors hover:bg-white/[0.04]'>
-          <Circle className='h-5 w-5 text-gold-300' />
-          <div>
-            <p className='font-serif text-lg text-ivory-50'>Tasbih</p>
-            <p className='text-[11px] text-ivory-100/50'>Compteur de dhikr</p>
           </div>
         </Link>
       </section>
@@ -193,6 +271,15 @@ export default function Home() {
         adhanSrc='/Adhan.mp3'
         volume={settings.adhanVolume}
         onDismiss={() => setAlarmOpen(false)}
+        qiblaOverlay={
+          qiblaBearing != null
+            ? {
+                qiblaBearing,
+                deviceHeading: heading.heading,
+                onActivate: () => void heading.request(),
+              }
+            : undefined
+        }
       />
     </PageShell>
   )

@@ -256,6 +256,18 @@ export default function SettingsPage() {
           checked={s.fajrAlarmEnabled}
           onChange={v => update('fajrAlarmEnabled', v)}
         />
+        <Link
+          href='/planner'
+          className='mt-3 flex items-center justify-between rounded-2xl bg-white/[0.02] px-4 py-3 text-sm text-ivory-50 transition-colors hover:bg-white/[0.04]'
+        >
+          <div>
+            <p>Jours actifs</p>
+            <p className='text-[11px] text-ivory-100/55'>
+              {Object.values(s.fajrAlarmDays).filter(Boolean).length}/7 jours · ouvrir le planning
+            </p>
+          </div>
+          <span className='text-gold-300'>→</span>
+        </Link>
         <div className='mt-4'>
           <label className='flex items-center justify-between text-sm text-ivory-100/80'>
             <span>Décalage (minutes)</span>

@@ -1,6 +1,6 @@
 import type { Location, Madhab } from '@/types/prayer'
 
-const KEY = 'sajda.settings.v4'
+const KEY = 'sajda.settings.v5'
 
 export type PrayerTune = {
   fajr: number
@@ -9,6 +9,16 @@ export type PrayerTune = {
   asr: number
   maghrib: number
   isha: number
+}
+
+export type WeekdayFlags = {
+  mon: boolean
+  tue: boolean
+  wed: boolean
+  thu: boolean
+  fri: boolean
+  sat: boolean
+  sun: boolean
 }
 
 export type Settings = {
@@ -20,9 +30,13 @@ export type Settings = {
   tune: PrayerTune
   fajrAlarmEnabled: boolean
   fajrAlarmOffsetMin: number
+  fajrAlarmDays: WeekdayFlags
   adhanVolume: number
   jumuahReminderEnabled: boolean
   sunnahDailyEnabled: boolean
+  preferredReciterId: string
+  mushafMode: boolean
+  weeklyPlannerNotifEnabled: boolean
 }
 
 export const DEFAULT_TUNE: PrayerTune = {
@@ -34,18 +48,32 @@ export const DEFAULT_TUNE: PrayerTune = {
   isha: 0,
 }
 
+export const DEFAULT_ALARM_DAYS: WeekdayFlags = {
+  mon: true,
+  tue: true,
+  wed: true,
+  thu: true,
+  fri: true,
+  sat: true,
+  sun: true,
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   location: null,
-  method: 2,
+  method: 3,
   madhab: 'maliki',
   customFajrAngle: 15,
   customIshaAngle: 15,
   tune: DEFAULT_TUNE,
   fajrAlarmEnabled: true,
   fajrAlarmOffsetMin: 0,
+  fajrAlarmDays: DEFAULT_ALARM_DAYS,
   adhanVolume: 1,
   jumuahReminderEnabled: true,
   sunnahDailyEnabled: true,
+  preferredReciterId: 'ar.alafasy',
+  mushafMode: false,
+  weeklyPlannerNotifEnabled: true,
 }
 
 export const loadSettings = (): Settings => {
@@ -58,6 +86,7 @@ export const loadSettings = (): Settings => {
       ...DEFAULT_SETTINGS,
       ...parsed,
       tune: { ...DEFAULT_TUNE, ...(parsed.tune ?? {}) },
+      fajrAlarmDays: { ...DEFAULT_ALARM_DAYS, ...(parsed.fajrAlarmDays ?? {}) },
     }
   } catch {
     return DEFAULT_SETTINGS

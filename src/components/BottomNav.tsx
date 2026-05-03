@@ -1,6 +1,6 @@
 'use client'
 
-import { BookOpen, CalendarDays, Circle, Home, Lock, Mic, Settings } from 'lucide-react'
+import { BookOpen, CalendarDays, Circle, Compass, Home, Settings } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -8,13 +8,12 @@ type Item = {
   href: string
   label: string
   icon: React.ComponentType<{ className?: string }>
-  locked?: boolean
 }
 
 const ITEMS: Item[] = [
   { href: '/', label: 'Accueil', icon: Home },
   { href: '/quran', label: 'Coran', icon: BookOpen },
-  { href: '/recitation', label: 'Récit.', icon: Mic, locked: true },
+  { href: '/qibla', label: 'Qibla', icon: Compass },
   { href: '/tasbih', label: 'Tasbih', icon: Circle },
   { href: '/calendar', label: 'Calend.', icon: CalendarDays },
   { href: '/settings', label: 'Réglages', icon: Settings },
@@ -28,7 +27,7 @@ export const BottomNav = () => {
   return (
     <nav className='fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-md px-4 pb-[env(safe-area-inset-bottom)] pt-2'>
       <div className='glass mx-auto flex items-center justify-between rounded-full border-white/10 px-2 py-1.5 backdrop-blur-2xl'>
-        {ITEMS.map(({ href, label, icon: Icon, locked }) => {
+        {ITEMS.map(({ href, label, icon: Icon }) => {
           const active = isActive(href)
           return (
             <Link
@@ -36,7 +35,7 @@ export const BottomNav = () => {
               href={href}
               aria-label={label}
               className={`group flex flex-1 flex-col items-center gap-0.5 rounded-full px-2 py-2 transition-colors ${
-                active ? 'text-gold-300' : locked ? 'text-ivory-100/35' : 'text-ivory-100/60 hover:text-ivory-100'
+                active ? 'text-gold-300' : 'text-ivory-100/60 hover:text-ivory-100'
               }`}
             >
               <span
@@ -45,9 +44,6 @@ export const BottomNav = () => {
                 }`}
               >
                 <Icon className='h-4 w-4' />
-                {locked && (
-                  <Lock className='absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-ink-900 p-[1px] text-gold-300/80 ring-1 ring-ink-900' />
-                )}
               </span>
               <span className='text-[10px] font-medium tracking-wide'>{label}</span>
             </Link>

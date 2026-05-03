@@ -2,16 +2,21 @@
 
 import { useEffect } from 'react'
 import { buildPrayerDate } from '@/lib/api/aladhan'
-import type { PrayerTimes } from '@/types/prayer'
+import type { WeekdayFlags } from '@/lib/storage/settings'
+
+const WEEKDAY_KEYS: (keyof WeekdayFlags)[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+
+const isDayActive = (date: Date, days: WeekdayFlags): boolean => days[WEEKDAY_KEYS[date.getDay()]]
 
 type Args = {
   enabled: boolean
   fajrTime: string | undefined
   offsetMinutes: number
+  days: WeekdayFlags
   onTrigger: () => void
 }
 
-export const useFajrAlarmScheduler = ({ enabled, fajrTime, offsetMinutes, onTrigger }: Args) => {
+export const useFajrAlarmScheduler = ({ enabled, fajrTime, offsetMinutes, days, onTrigger }: Args) => {
   useEffect(() => {
     if (!enabled || !fajrTime) return
 
@@ -19,21 +24,26 @@ export const useFajrAlarmScheduler = ({ enabled, fajrTime, offsetMinutes, onTrig
       const now = new Date()
       let target = buildPrayerDate(fajrTime, now)
       target = new Date(target.getTime() + offsetMinutes * 60_000)
-      if (target.getTime() <= now.getTime()) {
-        const tomorrow = new Date(now)
-        tomorrow.setDate(tomorrow.getDate() + 1)
-        target = buildPrayerDate(fajrTime, tomorrow)
-        target = new Date(target.getTime() + offsetMinutes * 60_000)
+      if (target.getTime() <= now.getTime() || !isDayActive(target, days)) {
+        const candidate = new Date(now)
+        for (let i = 1; i <= 7; i++) {
+          candidate.setDate(now.getDate() + i)
+          if (isDayActive(candidate, days)) {
+            target = buildPrayerDate(fajrTime, candidate)
+            target = new Date(target.getTime() + offsetMinutes * 60_000)
+            break
+          }
+        }
       }
       const delay = target.getTime() - now.getTime()
       return window.setTimeout(() => {
         onTrigger()
-      }, delay)
+      }, Math.max(0, delay))
     }
 
     const timeoutId = scheduleNext()
     return () => clearTimeout(timeoutId)
-  }, [enabled, fajrTime, offsetMinutes])
+  }, [enabled, fajrTime, offsetMinutes, days.mon, days.tue, days.wed, days.thu, days.fri, days.sat, days.sun])
 }
 
 export const buildAlarmKey = (fajrTime: string): string => {
