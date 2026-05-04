@@ -11,6 +11,7 @@ import { PageShell } from '@/components/PageShell'
 import { PrayerTimesCard } from '@/components/PrayerTimesCard'
 import { QiblaCompass } from '@/components/QiblaCompass'
 import { SunnahCard } from '@/components/SunnahCard'
+import { SunnahPrayersCard } from '@/components/SunnahPrayersCard'
 import { findCurrentPrayer, findNextPrayer } from '@/lib/api/aladhan'
 import { hijriMonthFr } from '@/lib/api/hijri'
 import { useDeviceHeading } from '@/lib/hooks/useDeviceHeading'
@@ -39,7 +40,7 @@ export default function Home() {
   const geo = useGeolocation(settings.location)
   const location = settings.location ?? geo.location
 
-  const { data, ishaEnd, loading, error } = usePrayerTimes({
+  const { data, ishaEnd, sunnah, loading, error } = usePrayerTimes({
     location,
     method: settings.method,
     madhab: settings.madhab,
@@ -137,6 +138,8 @@ export default function Home() {
       {data && next && (
         <PrayerTimesCard timings={data.timings} current={current} next={next.name} ishaEnd={ishaEnd} />
       )}
+
+      {data && <SunnahPrayersCard windows={sunnah} />}
 
       {qiblaBearing != null && (
         <Link
