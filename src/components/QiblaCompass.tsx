@@ -178,9 +178,34 @@ export const QiblaCompass = ({
               strokeWidth='0.5'
             />
             <g transform='translate(110, 18)'>
-              <rect x='-7' y='-12' width='14' height='14' rx='1' fill='#1a1a1a' stroke={aligned ? '#34d399' : '#d4a957'} strokeWidth='0.6' />
-              <rect x='-5' y='-10' width='10' height='10' fill='none' stroke={aligned ? '#34d399' : '#d4a957'} strokeWidth='0.4' />
-              <text x='0' y='-3' textAnchor='middle' fontSize='4' fill={aligned ? '#34d399' : '#d4a957'}>الكعبة</text>
+              <rect
+                x='-7'
+                y='-13'
+                width='14'
+                height='14'
+                rx='1.5'
+                fill='#0a0a0a'
+                stroke={aligned ? '#34d399' : '#d4a957'}
+                strokeWidth='0.8'
+              />
+              <rect
+                x='-5'
+                y='-11'
+                width='10'
+                height='10'
+                fill='none'
+                stroke={aligned ? '#34d399' : '#d4a957'}
+                strokeWidth='0.5'
+                opacity='0.6'
+              />
+              <rect
+                x='-1.5'
+                y='-5'
+                width='3'
+                height='4'
+                fill={aligned ? '#34d399' : '#d4a957'}
+                opacity='0.85'
+              />
             </g>
           </motion.g>
         </motion.g>
