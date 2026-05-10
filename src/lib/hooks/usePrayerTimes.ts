@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { DailyTimings, Location, Madhab } from '@/types/prayer'
 import { buildPrayerDate, fetchDailyTimings } from '@/lib/api/aladhan'
+import { computeFardWindows, type FardWindows } from '@/lib/prayer-windows'
 import type { PrayerTune } from '@/lib/storage/settings'
 
 type Args = {
@@ -29,6 +30,7 @@ type State = {
   data: DailyTimings | null
   ishaEnd: Date | null
   sunnah: SunnahWindows
+  fard: FardWindows | null
   loading: boolean
   error: string | null
 }
@@ -78,6 +80,7 @@ export const usePrayerTimes = ({
     data: null,
     ishaEnd: null,
     sunnah: EMPTY_WINDOWS,
+    fard: null,
     loading: false,
     error: null,
   })
@@ -106,10 +109,12 @@ export const usePrayerTimes = ({
       .then(([data, dataTomorrow]) => {
         if (cancelled) return
         const computed = computeSunnahWindows(data, dataTomorrow, today)
+        const fard = computeFardWindows(data, dataTomorrow, today)
         setState({
           data,
           ishaEnd: computed.ishaEnd,
           sunnah: computed.windows,
+          fard,
           loading: false,
           error: null,
         })
@@ -120,6 +125,7 @@ export const usePrayerTimes = ({
             data: null,
             ishaEnd: null,
             sunnah: EMPTY_WINDOWS,
+            fard: null,
             loading: false,
             error: String(err),
           })

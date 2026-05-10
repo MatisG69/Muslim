@@ -1,9 +1,11 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Moon, Sun, Sunrise } from 'lucide-react'
+import { Check, Moon, Sun, Sunrise } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { TIME_BASED_PRAYERS } from '@/data/sunnah-prayers'
 import type { SunnahWindows } from '@/lib/hooks/usePrayerTimes'
+import { usePrayerCompletion } from '@/lib/storage/prayer-tracking'
 
 type Props = {
   windows: SunnahWindows
@@ -19,11 +21,23 @@ const ICONS = {
   tahiyyat: Sun,
 } as const
 
-const isInWindow = (now: Date, start: Date, end: Date): boolean =>
-  now.getTime() >= start.getTime() && now.getTime() <= end.getTime()
+type WindowState = 'upcoming' | 'active' | 'expired'
+
+const stateOf = (now: Date, start: Date, end: Date): WindowState => {
+  const t = now.getTime()
+  if (t < start.getTime()) return 'upcoming'
+  if (t >= end.getTime()) return 'expired'
+  return 'active'
+}
 
 export const SunnahPrayersCard = ({ windows }: Props) => {
-  const now = new Date()
+  const { isDone, toggle } = usePrayerCompletion()
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   return (
     <motion.section
@@ -41,27 +55,51 @@ export const SunnahPrayersCard = ({ windows }: Props) => {
 
       <ul className='divide-y divide-white/[0.05]'>
         {TIME_BASED_PRAYERS.map(p => {
-          const win = windows[p.windowKey === 'tahiyyat' ? 'duha' : p.windowKey]
+          const winKey = p.windowKey === 'tahiyyat' ? 'duha' : p.windowKey
+          const win = windows[winKey]
           const Icon = ICONS[p.windowKey]
-          const active = win && isInWindow(now, win.start, win.end)
+          const state = win ? stateOf(now, win.start, win.end) : null
+          const active = state === 'active'
+          const expired = state === 'expired'
+          const done = isDone(p.id)
 
           return (
             <li
               key={p.id}
-              className={`relative px-6 py-4 ${active ? 'bg-emerald-400/[0.04]' : ''}`}
+              className={`relative px-6 py-4 ${
+                done
+                  ? 'bg-emerald-400/[0.045]'
+                  : active
+                    ? 'bg-emerald-400/[0.04]'
+                    : expired
+                      ? 'bg-rose-400/[0.02]'
+                      : ''
+              }`}
             >
-              {active && <span className='absolute left-0 top-0 h-full w-[2px] bg-emerald-400/60' />}
+              {active && !done && (
+                <span className='absolute left-0 top-0 h-full w-[2px] bg-emerald-400/60' />
+              )}
+              {done && <span className='absolute left-0 top-0 h-full w-[2px] bg-emerald-400/80' />}
               <div className='flex items-start justify-between gap-4'>
                 <div className='flex flex-1 items-start gap-3'>
-                  <div
-                    className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
-                      active
-                        ? 'border-emerald-400/40 bg-emerald-400/[0.08]'
-                        : 'border-white/10 bg-white/[0.02]'
+                  <button
+                    type='button'
+                    onClick={() => toggle(p.id)}
+                    aria-label={done ? `Marquer ${p.name} non accomplie` : `Marquer ${p.name} accomplie`}
+                    className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                      done
+                        ? 'border-emerald-400/60 bg-emerald-400/15 text-emerald-300'
+                        : active
+                          ? 'border-emerald-400/40 bg-emerald-400/[0.08]'
+                          : 'border-white/10 bg-white/[0.02]'
                     }`}
                   >
-                    <Icon className={`h-3.5 w-3.5 ${active ? 'text-emerald-300' : 'text-gold-300/80'}`} />
-                  </div>
+                    {done ? (
+                      <Check className='h-4 w-4' strokeWidth={3} />
+                    ) : (
+                      <Icon className={`h-3.5 w-3.5 ${active ? 'text-emerald-300' : 'text-gold-300/80'}`} />
+                    )}
+                  </button>
                   <div className='flex-1'>
                     <div className='flex flex-wrap items-baseline gap-x-2'>
                       <span className='font-serif text-base text-ivory-50'>{p.name}</span>
@@ -82,9 +120,21 @@ export const SunnahPrayersCard = ({ windows }: Props) => {
                       <p className='font-serif text-sm tabular-nums text-ivory-50/95'>
                         {formatHm(win.start)} → {formatHm(win.end)}
                       </p>
-                      {active && (
+                      {done ? (
+                        <p className='mt-0.5 text-[9px] uppercase tracking-widest text-emerald-300'>
+                          Accomplie
+                        </p>
+                      ) : active ? (
                         <p className='mt-0.5 text-[9px] uppercase tracking-widest text-emerald-300'>
                           Fenêtre ouverte
+                        </p>
+                      ) : expired ? (
+                        <p className='mt-0.5 text-[9px] uppercase tracking-widest text-rose-300/80'>
+                          Fenêtre passée
+                        </p>
+                      ) : (
+                        <p className='mt-0.5 text-[9px] uppercase tracking-widest text-ivory-100/40'>
+                          À venir
                         </p>
                       )}
                     </>

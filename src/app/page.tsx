@@ -12,7 +12,6 @@ import { PrayerTimesCard } from '@/components/PrayerTimesCard'
 import { QiblaCompass } from '@/components/QiblaCompass'
 import { SunnahCard } from '@/components/SunnahCard'
 import { SunnahPrayersCard } from '@/components/SunnahPrayersCard'
-import { findCurrentPrayer, findNextPrayer } from '@/lib/api/aladhan'
 import { hijriMonthFr } from '@/lib/api/hijri'
 import { useDeviceHeading } from '@/lib/hooks/useDeviceHeading'
 import {
@@ -26,7 +25,9 @@ import {
   useFajrPrayerNotification,
   useWeeklyPlannerNotification,
 } from '@/lib/hooks/useLocalNotifications'
+import { usePrayerCompletionReminders } from '@/lib/hooks/usePrayerCompletionReminders'
 import { usePrayerTimes } from '@/lib/hooks/usePrayerTimes'
+import { findNextFardPrayer } from '@/lib/prayer-windows'
 import { computeQiblaBearing } from '@/lib/qibla'
 import { DEFAULT_SETTINGS, loadSettings, type Settings } from '@/lib/storage/settings'
 import { formatGregorianDate } from '@/lib/utils'
@@ -40,7 +41,7 @@ export default function Home() {
   const geo = useGeolocation(settings.location)
   const location = settings.location ?? geo.location
 
-  const { data, ishaEnd, sunnah, loading, error } = usePrayerTimes({
+  const { data, sunnah, fard, loading, error } = usePrayerTimes({
     location,
     method: settings.method,
     madhab: settings.madhab,
@@ -49,8 +50,10 @@ export default function Home() {
     tune: settings.tune,
   })
 
-  const next = useMemo(() => (data ? findNextPrayer(data.timings) : null), [data])
-  const current = useMemo(() => (data ? findCurrentPrayer(data.timings) : null), [data])
+  const next = useMemo(
+    () => (data && fard ? findNextFardPrayer(fard, data.timings) : null),
+    [data, fard],
+  )
 
   const heading = useDeviceHeading()
   const qiblaBearing = useMemo(
@@ -74,6 +77,7 @@ export default function Home() {
 
   useFajrPrayerNotification(settings.fajrAlarmEnabled, data?.timings.Fajr)
   useWeeklyPlannerNotification(settings.weeklyPlannerNotifEnabled)
+  usePrayerCompletionReminders(true, fard, sunnah)
 
   return (
     <PageShell>
@@ -136,7 +140,7 @@ export default function Home() {
       )}
 
       {data && next && (
-        <PrayerTimesCard timings={data.timings} current={current} next={next.name} ishaEnd={ishaEnd} />
+        <PrayerTimesCard timings={data.timings} windows={fard} next={next.name} />
       )}
 
       {data && <SunnahPrayersCard windows={sunnah} />}
