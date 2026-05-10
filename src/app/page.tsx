@@ -1,9 +1,9 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { BellRing, BookOpen, CalendarCheck, Circle, Compass, Droplets, Lock, MapPin, Mic, Volume2 } from 'lucide-react'
+import { BellRing, BookOpen, CalendarCheck, Circle, Compass, Droplets, Lock, MapPin, Mic, User, Volume2 } from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { AlarmOverlay } from '@/components/AlarmOverlay'
 import { JumuahBanner } from '@/components/JumuahBanner'
 import { NextPrayerCountdown } from '@/components/NextPrayerCountdown'
@@ -29,14 +29,14 @@ import { usePrayerCompletionReminders } from '@/lib/hooks/usePrayerCompletionRem
 import { usePrayerTimes } from '@/lib/hooks/usePrayerTimes'
 import { findNextFardPrayer } from '@/lib/prayer-windows'
 import { computeQiblaBearing, distanceToKaabaKm } from '@/lib/qibla'
-import { DEFAULT_SETTINGS, loadSettings, type Settings } from '@/lib/storage/settings'
+import { useAuth } from '@/lib/auth/AuthContext'
+import { useSettings } from '@/lib/storage/SettingsContext'
 import { formatGregorianDate } from '@/lib/utils'
 
 export default function Home() {
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
+  const { settings } = useSettings()
+  const { user } = useAuth()
   const [alarmOpen, setAlarmOpen] = useState(false)
-
-  useEffect(() => setSettings(loadSettings()), [])
 
   const geo = useGeolocation(settings.location)
   const location = settings.location ?? geo.location
@@ -96,16 +96,29 @@ export default function Home() {
           <p className='font-arabic text-2xl text-gold-300/80' dir='rtl'>السلام عليكم</p>
           <p className='mt-1 text-xs uppercase tracking-[0.3em] text-ivory-100/50'>Sajda</p>
         </motion.div>
-        {data && (
-          <div className='text-right'>
-            <p className='font-serif text-base text-ivory-50/95'>
-              {data.hijriDay} {hijriMonthFr(data.hijriMonth)}
-            </p>
-            <p className='font-arabic text-xs text-gold-300/70' dir='rtl'>
-              {data.hijriYear} هـ
-            </p>
-          </div>
-        )}
+        <div className='flex items-start gap-3'>
+          {data && (
+            <div className='text-right'>
+              <p className='font-serif text-base text-ivory-50/95'>
+                {data.hijriDay} {hijriMonthFr(data.hijriMonth)}
+              </p>
+              <p className='font-arabic text-xs text-gold-300/70' dir='rtl'>
+                {data.hijriYear} هـ
+              </p>
+            </div>
+          )}
+          <Link
+            href={user ? '/settings' : '/login'}
+            aria-label={user ? 'Compte' : 'Se connecter'}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors ${
+              user
+                ? 'border-gold-400/40 bg-gold-400/[0.08] text-gold-300 hover:bg-gold-400/[0.14]'
+                : 'border-white/10 bg-white/[0.02] text-ivory-100/70 hover:border-gold-400/40 hover:text-gold-300'
+            }`}
+          >
+            <User className='h-4 w-4' />
+          </Link>
+        </div>
       </header>
 
       {data && (

@@ -3,13 +3,13 @@
 import { motion } from 'framer-motion'
 import { ChevronLeft, Compass, MapPin, Navigation, RotateCw } from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { PageShell } from '@/components/PageShell'
 import { QiblaCompass } from '@/components/QiblaCompass'
 import { useDeviceHeading } from '@/lib/hooks/useDeviceHeading'
 import { useGeolocation } from '@/lib/hooks/useGeolocation'
 import { computeQiblaBearing, distanceToKaabaKm } from '@/lib/qibla'
-import { DEFAULT_SETTINGS, loadSettings, type Settings } from '@/lib/storage/settings'
+import { useSettings } from '@/lib/storage/SettingsContext'
 
 const directionLabel = (delta: number, aligned: boolean): string => {
   if (aligned) return 'Vous êtes face à la Qibla'
@@ -19,8 +19,7 @@ const directionLabel = (delta: number, aligned: boolean): string => {
 }
 
 export default function QiblaPage() {
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
-  useEffect(() => setSettings(loadSettings()), [])
+  const { settings } = useSettings()
   const geo = useGeolocation(settings.location)
   const location = settings.location ?? geo.location
 

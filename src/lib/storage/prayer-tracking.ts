@@ -1,6 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAuth } from '@/lib/auth/AuthContext'
+import { supabase } from '@/lib/supabase/client'
 
 const KEY_PREFIX = 'sajda.prayer.done.'
 
@@ -22,16 +24,9 @@ export const loadCompletion = (date = new Date()): DailyCompletion => {
   }
 }
 
-export const saveCompletion = (data: DailyCompletion, date = new Date()): void => {
+const saveCompletionLocal = (data: DailyCompletion, date = new Date()): void => {
   if (typeof window === 'undefined') return
   localStorage.setItem(storageKey(date), JSON.stringify(data))
-}
-
-export const setCompleted = (id: string, done: boolean, date = new Date()): DailyCompletion => {
-  const current = loadCompletion(date)
-  const next = { ...current, [id]: done }
-  saveCompletion(next, date)
-  return next
 }
 
 const STORAGE_EVENT = 'sajda:completion-change'
@@ -41,31 +36,103 @@ const emitChange = () => {
   window.dispatchEvent(new Event(STORAGE_EVENT))
 }
 
+const fetchRemoteCompletion = async (
+  userId: string,
+  date: Date,
+): Promise<DailyCompletion> => {
+  const { data, error } = await supabase()
+    .from('prayer_completions')
+    .select('prayer_id, done')
+    .eq('user_id', userId)
+    .eq('date', ymd(date))
+  if (error) throw error
+  const out: DailyCompletion = {}
+  for (const row of data ?? []) {
+    if (row.done) out[row.prayer_id] = true
+  }
+  return out
+}
+
+const upsertRemoteCompletion = async (
+  userId: string,
+  date: Date,
+  prayerId: string,
+  done: boolean,
+): Promise<void> => {
+  if (done) {
+    const { error } = await supabase()
+      .from('prayer_completions')
+      .upsert(
+        { user_id: userId, date: ymd(date), prayer_id: prayerId, done: true },
+        { onConflict: 'user_id,date,prayer_id' },
+      )
+    if (error) throw error
+  } else {
+    const { error } = await supabase()
+      .from('prayer_completions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('date', ymd(date))
+      .eq('prayer_id', prayerId)
+    if (error) throw error
+  }
+}
+
 export const usePrayerCompletion = (date = new Date()) => {
+  const { user, loading: authLoading } = useAuth()
   const [completion, setCompletion] = useState<DailyCompletion>({})
+  const dayKey = ymd(date)
+  const dateRef = useRef(date)
+  dateRef.current = date
 
   useEffect(() => {
-    setCompletion(loadCompletion(date))
-    const onChange = () => setCompletion(loadCompletion(date))
+    if (authLoading) return
+    let cancelled = false
+
+    const hydrate = async () => {
+      const local = loadCompletion(dateRef.current)
+      if (!user) {
+        if (!cancelled) setCompletion(local)
+        return
+      }
+      try {
+        const remote = await fetchRemoteCompletion(user.id, dateRef.current)
+        if (cancelled) return
+        setCompletion(remote)
+        saveCompletionLocal(remote, dateRef.current)
+      } catch (err) {
+        console.error('[completion] fetch error', err)
+        if (!cancelled) setCompletion(local)
+      }
+    }
+
+    void hydrate()
+    const onChange = () => setCompletion(loadCompletion(dateRef.current))
     window.addEventListener(STORAGE_EVENT, onChange)
     window.addEventListener('storage', onChange)
     return () => {
+      cancelled = true
       window.removeEventListener(STORAGE_EVENT, onChange)
       window.removeEventListener('storage', onChange)
     }
-  }, [ymd(date)])
+  }, [authLoading, user?.id, dayKey])
 
   const toggle = useCallback(
     (id: string, done?: boolean) => {
       setCompletion(prev => {
         const nextValue = done ?? !prev[id]
         const next = { ...prev, [id]: nextValue }
-        saveCompletion(next, date)
+        saveCompletionLocal(next, dateRef.current)
         emitChange()
+        if (user) {
+          void upsertRemoteCompletion(user.id, dateRef.current, id, nextValue).catch(err =>
+            console.error('[completion] upsert error', err),
+          )
+        }
         return next
       })
     },
-    [date],
+    [user?.id],
   )
 
   const isDone = useCallback((id: string): boolean => completion[id] === true, [completion])

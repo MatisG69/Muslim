@@ -3,16 +3,11 @@
 import { motion } from 'framer-motion'
 import { BellRing, BellOff, ChevronLeft, Sparkles } from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { PageShell } from '@/components/PageShell'
 import { useNotificationPermission } from '@/lib/hooks/useLocalNotifications'
-import {
-  DEFAULT_SETTINGS,
-  loadSettings,
-  saveSettings,
-  type Settings,
-  type WeekdayFlags,
-} from '@/lib/storage/settings'
+import { useSettings } from '@/lib/storage/SettingsContext'
+import type { WeekdayFlags } from '@/lib/storage/settings'
 
 const DAYS: { key: keyof WeekdayFlags; label: string; arabic: string; weekdayIndex: number }[] = [
   { key: 'mon', label: 'Lundi', arabic: 'الإثنين', weekdayIndex: 1 },
@@ -25,21 +20,14 @@ const DAYS: { key: keyof WeekdayFlags; label: string; arabic: string; weekdayInd
 ]
 
 export default function PlannerPage() {
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
+  const { settings, update } = useSettings()
   const { perm, request } = useNotificationPermission()
-  useEffect(() => setSettings(loadSettings()), [])
-
-  const update = <K extends keyof Settings>(key: K, value: Settings[K]) => {
-    const next = { ...settings, [key]: value }
-    setSettings(next)
-    saveSettings(next)
-  }
 
   const toggleDay = (key: keyof WeekdayFlags) => {
-    update('fajrAlarmDays', { ...settings.fajrAlarmDays, [key]: !settings.fajrAlarmDays[key] })
+    update({ fajrAlarmDays: { ...settings.fajrAlarmDays, [key]: !settings.fajrAlarmDays[key] } })
   }
 
-  const setPreset = (preset: WeekdayFlags) => update('fajrAlarmDays', preset)
+  const setPreset = (preset: WeekdayFlags) => update({ fajrAlarmDays: preset })
 
   const enabledCount = useMemo(
     () => Object.values(settings.fajrAlarmDays).filter(Boolean).length,
@@ -182,7 +170,7 @@ export default function PlannerPage() {
         </div>
         <button
           type='button'
-          onClick={() => update('weeklyPlannerNotifEnabled', !settings.weeklyPlannerNotifEnabled)}
+          onClick={() => update({ weeklyPlannerNotifEnabled: !settings.weeklyPlannerNotifEnabled })}
           className='shrink-0'
           aria-label='Activer notification hebdo'
         >

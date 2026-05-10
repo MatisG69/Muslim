@@ -21,7 +21,7 @@ import { PageShell } from '@/components/PageShell'
 import { fetchSurahDetail, type SurahDetail, type Ayah } from '@/lib/api/quran'
 import { QuranPlayer } from '@/lib/audio/quranPlayer'
 import { RECITERS, DEFAULT_RECITER_ID, type Reciter } from '@/data/reciters'
-import { loadSettings, saveSettings, DEFAULT_SETTINGS, type Settings } from '@/lib/storage/settings'
+import { useSettings } from '@/lib/storage/SettingsContext'
 
 type ContextMenu = {
   ayah: Ayah
@@ -50,7 +50,7 @@ export default function SurahReader() {
   const [showFrench, setShowFrench] = useState(true)
   const [showTransliteration, setShowTransliteration] = useState(true)
 
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
+  const { settings, update: updateSettingsCtx } = useSettings()
   const [reciterId, setReciterId] = useState(DEFAULT_RECITER_ID)
   const [mushaf, setMushaf] = useState(false)
   const [showReciterPicker, setShowReciterPicker] = useState(false)
@@ -78,11 +78,9 @@ export default function SurahReader() {
   )
 
   useEffect(() => {
-    const s = loadSettings()
-    setSettings(s)
-    setReciterId(s.preferredReciterId || DEFAULT_RECITER_ID)
-    setMushaf(s.mushafMode)
-  }, [])
+    setReciterId(settings.preferredReciterId || DEFAULT_RECITER_ID)
+    setMushaf(settings.mushafMode)
+  }, [settings.preferredReciterId, settings.mushafMode])
 
   useEffect(() => {
     setData(null)
@@ -161,10 +159,8 @@ export default function SurahReader() {
     setActiveRepeatIdx(0)
   }
 
-  const updateSetting = <K extends keyof Settings>(key: K, value: Settings[K]) => {
-    const next = { ...settings, [key]: value }
-    setSettings(next)
-    saveSettings(next)
+  const updateSetting = <K extends keyof typeof settings>(key: K, value: (typeof settings)[K]) => {
+    updateSettingsCtx({ [key]: value })
   }
 
   const setReciterPersist = (id: string) => {

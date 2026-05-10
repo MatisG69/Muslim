@@ -1,31 +1,24 @@
 'use client'
 
-import { ChevronLeft, MapPin, RotateCcw } from 'lucide-react'
+import { ChevronLeft, LogIn, LogOut, MapPin, RotateCcw, User } from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { PageShell } from '@/components/PageShell'
 import { reverseGeocode } from '@/lib/api/aladhan'
-import {
-  DEFAULT_SETTINGS,
-  DEFAULT_TUNE,
-  loadSettings,
-  saveSettings,
-  type Settings,
-} from '@/lib/storage/settings'
+import { useAuth } from '@/lib/auth/AuthContext'
+import { useSettings } from '@/lib/storage/SettingsContext'
+import { DEFAULT_TUNE, type Settings } from '@/lib/storage/settings'
 import { CALCULATION_METHODS, MADHAB_LABELS, type Madhab } from '@/types/prayer'
 
 export default function SettingsPage() {
-  const [s, setS] = useState<Settings>(DEFAULT_SETTINGS)
+  const { settings: s, update: updateSettings, syncStatus, source } = useSettings()
+  const { user, signOut } = useAuth()
   const [cityInput, setCityInput] = useState('')
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
 
-  useEffect(() => setS(loadSettings()), [])
-
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => {
-    const next = { ...s, [key]: value }
-    setS(next)
-    saveSettings(next)
+    updateSettings({ [key]: value } as Partial<Settings>)
   }
 
   const detectLocation = () => {
@@ -77,6 +70,58 @@ export default function SettingsPage() {
         </Link>
         <h1 className='font-serif text-3xl text-ivory-50'>Réglages</h1>
       </header>
+
+      <Section
+        title='Compte'
+        subtitle={
+          user
+            ? source === 'remote'
+              ? syncStatus === 'saving'
+                ? 'Synchronisation…'
+                : syncStatus === 'error'
+                  ? 'Erreur de synchronisation'
+                  : 'Synchronisé'
+              : 'Connecté · sync indisponible'
+            : 'Crée un compte pour synchroniser tes préférences'
+        }
+      >
+        {user ? (
+          <div className='flex items-center justify-between gap-3 rounded-2xl bg-white/[0.03] px-4 py-3'>
+            <div className='flex items-center gap-3 overflow-hidden'>
+              <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gold-400/30 bg-gold-400/[0.08]'>
+                <User className='h-4 w-4 text-gold-300' />
+              </div>
+              <div className='min-w-0'>
+                <p className='truncate text-sm text-ivory-50'>{user.email}</p>
+                <p className='text-[10px] uppercase tracking-widest text-ivory-100/45'>
+                  Connecté
+                </p>
+              </div>
+            </div>
+            <button
+              type='button'
+              onClick={() => void signOut()}
+              className='btn-ghost shrink-0 text-xs'
+            >
+              <LogOut className='h-3.5 w-3.5' />
+              Déconnexion
+            </button>
+          </div>
+        ) : (
+          <Link
+            href='/login'
+            className='flex items-center justify-between gap-3 rounded-2xl border border-gold-400/40 bg-gold-400/[0.06] px-4 py-3 transition-colors hover:bg-gold-400/[0.1]'
+          >
+            <div>
+              <p className='text-sm text-ivory-50'>Se connecter ou créer un compte</p>
+              <p className='text-[11px] text-ivory-100/60'>
+                Tes préférences seront synchronisées sur tous tes appareils
+              </p>
+            </div>
+            <LogIn className='h-4 w-4 text-gold-300' />
+          </Link>
+        )}
+      </Section>
 
       <Section title='Localisation' subtitle='Définit le calcul des horaires'>
         <div className='space-y-3'>

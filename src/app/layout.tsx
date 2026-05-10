@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Cormorant_Garamond, Inter, Amiri } from 'next/font/google'
 import './globals.css'
+import { AppProviders } from './providers'
 
 const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
@@ -53,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             style={{ backgroundImage: 'url(/patterns/arabesque.svg)', backgroundSize: '180px' }}
             aria-hidden
           />
-          {children}
+          <AppProviders>{children}</AppProviders>
         </div>
       </body>
     </html>
