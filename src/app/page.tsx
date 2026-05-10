@@ -28,7 +28,7 @@ import {
 import { usePrayerCompletionReminders } from '@/lib/hooks/usePrayerCompletionReminders'
 import { usePrayerTimes } from '@/lib/hooks/usePrayerTimes'
 import { findNextFardPrayer } from '@/lib/prayer-windows'
-import { computeQiblaBearing } from '@/lib/qibla'
+import { computeQiblaBearing, distanceToKaabaKm } from '@/lib/qibla'
 import { DEFAULT_SETTINGS, loadSettings, type Settings } from '@/lib/storage/settings'
 import { formatGregorianDate } from '@/lib/utils'
 
@@ -60,6 +60,16 @@ export default function Home() {
     () => (location ? computeQiblaBearing(location.latitude, location.longitude) : null),
     [location?.latitude, location?.longitude],
   )
+  const kaabaDistance = useMemo(
+    () => (location ? distanceToKaabaKm(location.latitude, location.longitude) : null),
+    [location?.latitude, location?.longitude],
+  )
+
+  const qiblaAlignment = useMemo(() => {
+    if (qiblaBearing == null || heading.heading == null) return null
+    const delta = ((qiblaBearing - heading.heading + 540) % 360) - 180
+    return { delta, aligned: Math.abs(delta) < 7, close: Math.abs(delta) < 20 }
+  }, [qiblaBearing, heading.heading])
 
   useFajrAlarmScheduler({
     enabled: settings.fajrAlarmEnabled,
@@ -148,35 +158,93 @@ export default function Home() {
       {qiblaBearing != null && (
         <Link
           href='/qibla'
-          className='card flex items-center gap-4 px-5 py-4 transition-colors hover:bg-white/[0.04]'
+          className={`card group relative flex items-center gap-5 overflow-hidden px-5 py-5 transition-colors hover:bg-white/[0.04] ${
+            qiblaAlignment?.aligned ? 'ring-1 ring-emerald-400/30' : ''
+          }`}
         >
-          <div className='shrink-0'>
+          <div
+            className='pointer-events-none absolute inset-0 opacity-[0.04] transition-opacity group-hover:opacity-[0.06]'
+            style={{ backgroundImage: 'url(/patterns/arabesque.svg)', backgroundSize: '180px' }}
+            aria-hidden
+          />
+          <div
+            className={`pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl transition-colors ${
+              qiblaAlignment?.aligned
+                ? 'bg-emerald-400/15'
+                : qiblaAlignment?.close
+                  ? 'bg-amber-300/10'
+                  : 'bg-gold-400/[0.07]'
+            }`}
+            aria-hidden
+          />
+
+          <div className='relative shrink-0'>
             <QiblaCompass
               qiblaBearing={qiblaBearing}
               deviceHeading={heading.heading}
-              size={88}
+              size={112}
               showLabels={false}
+              enableHaptic={false}
             />
           </div>
-          <div className='flex-1'>
-            <p className='text-[10px] uppercase tracking-[0.3em] text-gold-300/70'>Direction Qibla</p>
-            <p className='mt-1 font-serif text-lg text-ivory-50'>{Math.round(qiblaBearing)}°</p>
-            {heading.status !== 'granted' ? (
-              <button
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  void heading.request()
-                }}
-                className='mt-1 text-[11px] text-gold-300 underline'
-              >
-                Activer la boussole
-              </button>
-            ) : (
-              <p className='text-[11px] text-ivory-100/50'>Touchez pour la vue complète</p>
+
+          <div className='relative flex-1'>
+            <div className='flex items-center gap-2'>
+              <p className='text-[10px] uppercase tracking-[0.3em] text-gold-300/70'>
+                Direction Qibla
+              </p>
+              <span className='font-arabic text-[11px] text-gold-300/55' dir='rtl'>
+                القبلة
+              </span>
+            </div>
+
+            <div className='mt-1.5 flex items-baseline gap-1.5'>
+              <p className='font-serif text-3xl text-ivory-50 tabular-nums leading-none'>
+                {Math.round(qiblaBearing)}
+              </p>
+              <span className='text-base text-gold-300/80'>°</span>
+              <span className='ml-1 text-[11px] uppercase tracking-widest text-ivory-100/45'>
+                {bearingCardinal(qiblaBearing)}
+              </span>
+            </div>
+
+            {kaabaDistance != null && (
+              <p className='mt-1 text-[11px] text-ivory-100/55'>
+                <span className='tabular-nums'>{Math.round(kaabaDistance).toLocaleString('fr-FR')}</span>
+                <span className='ml-1 text-ivory-100/40'>km · La Mecque</span>
+              </p>
             )}
+
+            <div className='mt-2.5 flex items-center gap-2'>
+              {heading.status !== 'granted' ? (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    void heading.request()
+                  }}
+                  className='inline-flex items-center gap-1.5 rounded-full border border-gold-400/40 bg-gold-400/[0.08] px-3 py-1 text-[11px] text-gold-200 transition-colors hover:bg-gold-400/[0.14]'
+                >
+                  <Compass className='h-3 w-3' />
+                  {heading.status === 'requesting' ? 'Activation…' : 'Activer la boussole'}
+                </button>
+              ) : qiblaAlignment?.aligned ? (
+                <span className='inline-flex items-center gap-1.5 rounded-full bg-emerald-400/15 px-2.5 py-1 text-[10px] uppercase tracking-widest text-emerald-300'>
+                  <span className='h-1.5 w-1.5 rounded-full bg-emerald-400' />
+                  Aligné
+                </span>
+              ) : (
+                <span className='inline-flex items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1 text-[10px] uppercase tracking-widest text-ivory-100/60'>
+                  <span className='h-1.5 w-1.5 rounded-full bg-gold-300' />
+                  Boussole active
+                </span>
+              )}
+            </div>
           </div>
-          <Compass className='h-5 w-5 shrink-0 text-gold-300' />
+
+          <span className='relative shrink-0 text-gold-300/70 transition-transform group-hover:translate-x-0.5'>
+            →
+          </span>
         </Link>
       )}
 
@@ -290,6 +358,13 @@ export default function Home() {
       />
     </PageShell>
   )
+}
+
+const CARDINALS_FR = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO']
+
+const bearingCardinal = (deg: number): string => {
+  const idx = Math.round(((deg % 360) + 360) % 360 / 45) % 8
+  return CARDINALS_FR[idx]
 }
 
 const Skeleton = () => (
