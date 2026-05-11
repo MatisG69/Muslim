@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { supabase } from '@/lib/supabase/client'
 import { WebRTCMesh, type PeerInfo } from '@/lib/webrtc/mesh'
@@ -10,7 +10,10 @@ type LiveState = 'idle' | 'connecting' | 'live' | 'error'
 
 const HEARTBEAT_MS = 30_000
 
-export const useWebRTCRoom = (roomId: string | null) => {
+export const useWebRTCRoom = (
+  roomId: string | null,
+  expectedPeers: Set<string> = new Set(),
+) => {
   const { user } = useAuth()
   const [liveState, setLiveState] = useState<LiveState>('idle')
   const [peers, setPeers] = useState<Map<string, PeerInfo>>(new Map())
@@ -142,6 +145,24 @@ export const useWebRTCRoom = (roomId: string | null) => {
       meshRef.current = null
     }
   }, [stopHeartbeat])
+
+  // Forward expectedPeers au mesh dès qu'il est live. setExpectedPeers est
+  // idempotent : il diffe et ne crée/ferme que ce qui change.
+  const expectedKey = useMemo(
+    () => Array.from(expectedPeers).sort().join(','),
+    [expectedPeers],
+  )
+
+  useEffect(() => {
+    const mesh = meshRef.current
+    if (!mesh || liveState !== 'live' || !user?.id) return
+    const others = new Set<string>()
+    expectedPeers.forEach(uid => {
+      if (uid !== user.id) others.add(uid)
+    })
+    mesh.setExpectedPeers(others)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expectedKey, liveState, user?.id])
 
   return { liveState, peers, localStream, muted, error, join, leave, toggleMute }
 }

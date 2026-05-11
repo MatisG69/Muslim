@@ -16,9 +16,9 @@ type Props = {
 
 export const LiveSessionPanel = ({ room }: Props) => {
   const { user } = useAuth()
-  const { liveState, peers, muted, error, join, leave, toggleMute, localStream } =
-    useWebRTCRoom(room.id)
   const { liveUserIds } = useRoomLobby(room.id)
+  const { liveState, peers, muted, error, join, leave, toggleMute, localStream } =
+    useWebRTCRoom(room.id, liveUserIds)
 
   // Wrappers minimaux — useWebRTCRoom gère lui-même la table room_sessions
   // qui est observée par useRoomLobby (postgres_changes).

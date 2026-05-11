@@ -8,11 +8,14 @@ import { PEER_CONFIG } from './ice'
 // Mesh WebRTC P2P pour rooms Halaqa (max ~6 participants)
 //
 // Architecture :
-// - Une room = un canal Supabase Realtime "halaqa:{roomId}"
-// - Présence (channel.track) maintient la liste des peers connectés
-// - Quand un peer arrive, le peer dont l'userId est lexicographiquement
-//   "plus petit" initie l'offer (déterminisme → pas de glare)
-// - Échanges SDP + ICE via broadcast events sur le canal
+// - Une room = un canal Supabase Realtime "halaqa:{roomId}" utilisé
+//   UNIQUEMENT pour le signaling SDP+ICE via broadcast.
+// - La découverte des peers se fait à l'extérieur (table room_sessions +
+//   postgres_changes via useRoomLobby), pas via la présence Realtime
+//   (présence inter-clients pas fiable dans tous les projets Supabase).
+// - L'appelant injecte la liste des userIds attendus via setExpectedPeers().
+// - Le peer dont l'userId est lexicographiquement "plus petit" initie
+//   l'offer (déterminisme → pas de glare).
 // =====================================================================
 
 const log = (...args: unknown[]) => console.info('[Halaqa]', ...args)
@@ -39,6 +42,7 @@ type SignalPayload =
   | { type: 'offer'; from: string; to: string; sdp: RTCSessionDescriptionInit }
   | { type: 'answer'; from: string; to: string; sdp: RTCSessionDescriptionInit }
   | { type: 'ice'; from: string; to: string; candidate: RTCIceCandidateInit }
+  | { type: 'hello'; from: string }
   | { type: 'leave'; from: string }
 
 export class WebRTCMesh {
@@ -100,18 +104,14 @@ export class WebRTCMesh {
     this.localStream = stream
     this.emit('local-stream', stream)
 
-    // 2. Connexion au canal Realtime
+    // 2. Connexion au canal Realtime — broadcast SEULEMENT (pas de présence)
     const sb = supabase()
     const channel = sb.channel(`halaqa:${this.roomId}`, {
       config: {
-        presence: { key: this.localUserId },
         broadcast: { self: false, ack: false },
       },
     })
     this.channel = channel
-
-    channel.on('presence', { event: 'sync' }, () => this.handlePresenceSync())
-    channel.on('presence', { event: 'leave' }, ({ key }) => this.handlePeerLeave(key))
 
     channel.on('broadcast', { event: 'signal' }, ({ payload }) => {
       this.handleSignal(payload as SignalPayload).catch(err => {
@@ -123,11 +123,16 @@ export class WebRTCMesh {
     log('Joining channel', `halaqa:${this.roomId}`, 'as', this.localUserId)
 
     await new Promise<void>((resolve, reject) => {
-      channel.subscribe(async status => {
+      channel.subscribe(status => {
         log('Channel status:', status)
         if (status === 'SUBSCRIBED') {
-          const trackResult = await channel.track({ user_id: this.localUserId, joined_at: Date.now() })
-          log('Tracked presence, result:', trackResult)
+          // Annonce notre arrivée — pour que d'éventuels peers déjà connectés
+          // ré-évaluent l'offer si besoin (utile quand l'initiateur est nous).
+          channel.send({
+            type: 'broadcast',
+            event: 'signal',
+            payload: { type: 'hello', from: this.localUserId } satisfies SignalPayload,
+          })
           resolve()
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           reject(new Error(`Subscribe failed: ${status}`))
@@ -136,41 +141,32 @@ export class WebRTCMesh {
     })
   }
 
-  private handlePresenceSync() {
-    if (!this.channel) return
-    const state = this.channel.presenceState<{ user_id?: string }>()
-    const remoteUserIds = new Set<string>()
-    Object.values(state).forEach(presences => {
-      const userId = presences[0]?.user_id
-      // Ignore les présences sans user_id (observateurs lobby, etc.)
-      if (!userId) return
-      if (userId !== this.localUserId) remoteUserIds.add(userId)
-    })
-
-    log('Presence sync — all keys:', Object.keys(state), 'remote peers:', Array.from(remoteUserIds))
+  /**
+   * Définit la liste des userIds qui devraient être connectés à nous.
+   * Appelée par l'extérieur (useWebRTCRoom) quand la liste des "live" change
+   * (source : useRoomLobby qui observe la table room_sessions).
+   */
+  setExpectedPeers(remoteUserIds: Set<string>) {
+    if (this.destroyed) return
+    log('setExpectedPeers:', Array.from(remoteUserIds))
 
     // Crée les PC manquantes
     remoteUserIds.forEach(uid => {
+      if (uid === this.localUserId) return
       if (!this.peers.has(uid)) {
-        log('New peer detected, creating connection:', uid)
+        log('New peer expected, creating connection:', uid)
         this.createPeer(uid)
       }
     })
 
-    // Supprime les peers qui ne sont plus présents
+    // Ferme les peers qui ne sont plus attendus
     Array.from(this.peers.keys()).forEach(uid => {
       if (!remoteUserIds.has(uid)) {
-        log('Peer left presence, closing:', uid)
+        log('Peer no longer expected, closing:', uid)
         this.closePeer(uid)
       }
     })
 
-    this.notifyPeers()
-  }
-
-  private handlePeerLeave(key: string) {
-    if (key === this.localUserId) return
-    this.closePeer(key)
     this.notifyPeers()
   }
 
@@ -185,7 +181,6 @@ export class WebRTCMesh {
     const peer = { pc, info, pendingIce: [] as RTCIceCandidateInit[] }
     this.peers.set(remoteUserId, peer)
 
-    // Ajoute les tracks locaux
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => {
         pc.addTrack(track, this.localStream!)
@@ -263,14 +258,30 @@ export class WebRTCMesh {
   private async handleSignal(signal: SignalPayload) {
     if ('to' in signal && signal.to !== this.localUserId) return
     log('Received signal:', signal.type, 'from', signal.from.slice(0, 8))
+
     if (signal.type === 'leave') {
       this.closePeer(signal.from)
       this.notifyPeers()
       return
     }
 
+    if (signal.type === 'hello') {
+      // Un nouveau peer vient de subscribe au canal. S'il est dans nos peers
+      // attendus et qu'on est l'initiateur (moi plus petit), refaire l'offer
+      // (utile au cas où le premier offer a précédé son subscribe).
+      const peer = this.peers.get(signal.from)
+      if (peer && this.localUserId < signal.from) {
+        log(`Hello from ${signal.from.slice(0, 8)}, re-sending offer`)
+        this.makeOffer(signal.from).catch(() => {})
+      }
+      return
+    }
+
     let peer = this.peers.get(signal.from)
     if (!peer) {
+      // Le peer n'était pas attendu, mais il nous envoie un signal valide.
+      // Crée la PC à la volée.
+      log('Unsolicited signal — creating peer for', signal.from.slice(0, 8))
       this.createPeer(signal.from)
       peer = this.peers.get(signal.from)
       if (!peer) return
@@ -278,7 +289,6 @@ export class WebRTCMesh {
 
     if (signal.type === 'offer') {
       await peer.pc.setRemoteDescription(signal.sdp)
-      // flush ICE en attente
       for (const cand of peer.pendingIce) {
         await peer.pc.addIceCandidate(cand).catch(() => {})
       }
@@ -340,7 +350,6 @@ export class WebRTCMesh {
     if (this.destroyed) return
     this.destroyed = true
 
-    // Notifie les peers
     if (this.channel) {
       try {
         this.channel.send({
@@ -351,20 +360,14 @@ export class WebRTCMesh {
       } catch {}
     }
 
-    // Ferme toutes les PC
     Array.from(this.peers.keys()).forEach(uid => this.closePeer(uid))
 
-    // Arrête les tracks locaux
     if (this.localStream) {
       this.localStream.getTracks().forEach(t => t.stop())
       this.localStream = null
     }
 
-    // Quitte le canal
     if (this.channel) {
-      try {
-        await this.channel.untrack()
-      } catch {}
       try {
         await supabase().removeChannel(this.channel)
       } catch {}
