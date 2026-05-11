@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, MicOff, PhoneIncoming, PhoneOff, Radio } from 'lucide-react'
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { useRoomLobby } from '@/lib/halaqa/useRoomLobby'
 import { useWebRTCRoom } from '@/lib/halaqa/useWebRTCRoom'
@@ -18,7 +18,51 @@ export const LiveSessionPanel = ({ room }: Props) => {
   const { user } = useAuth()
   const { liveState, peers, muted, error, join, leave, toggleMute, localStream } =
     useWebRTCRoom(room.id)
-  const { liveUserIds } = useRoomLobby(room.id)
+  const { liveUserIds, announce, unannounce } = useRoomLobby(room.id)
+  const announcedRef = useRef(false)
+
+  const handleJoin = useCallback(async () => {
+    try {
+      await join()
+      if (user?.id) {
+        await announce(user.id)
+        announcedRef.current = true
+      }
+    } catch {
+      // erreur déjà gérée dans useWebRTCRoom
+    }
+  }, [join, announce, user?.id])
+
+  const handleLeave = useCallback(async () => {
+    if (announcedRef.current) {
+      await unannounce()
+      announcedRef.current = false
+    }
+    await leave()
+  }, [leave, unannounce])
+
+  // Si le mesh change d'état (ex. erreur), synchronise l'annonce lobby
+  useEffect(() => {
+    if (liveState === 'live' && !announcedRef.current && user?.id) {
+      announce(user.id).then(() => {
+        announcedRef.current = true
+      })
+    }
+    if (liveState === 'idle' && announcedRef.current) {
+      unannounce()
+      announcedRef.current = false
+    }
+  }, [liveState, user?.id, announce, unannounce])
+
+  // Au démontage du composant : libérer l'annonce
+  useEffect(() => {
+    return () => {
+      if (announcedRef.current) {
+        unannounce()
+        announcedRef.current = false
+      }
+    }
+  }, [unannounce])
 
   const memberMap = useMemo(() => {
     const map = new Map<string, RoomWithMembers['members'][number]['profile']>()
@@ -94,7 +138,7 @@ export const LiveSessionPanel = ({ room }: Props) => {
               )}
             </div>
 
-            <button type='button' onClick={join} className='btn-primary text-sm'>
+            <button type='button' onClick={handleJoin} className='btn-primary text-sm'>
               <PhoneIncoming className='h-4 w-4' />
               Rejoindre le live
             </button>
@@ -114,7 +158,7 @@ export const LiveSessionPanel = ({ room }: Props) => {
             Démarre la halaqa en direct. Les autres membres recevront une invitation à rejoindre.
           </p>
         </div>
-        <button type='button' onClick={join} className='btn-primary text-sm'>
+        <button type='button' onClick={handleJoin} className='btn-primary text-sm'>
           <Mic className='h-4 w-4' />
           Démarrer le live
         </button>
@@ -135,7 +179,7 @@ export const LiveSessionPanel = ({ room }: Props) => {
     return (
       <div className='card flex flex-col items-center gap-3 px-6 py-6 text-center'>
         <p className='text-xs text-rose-300'>{error ?? 'Erreur micro / réseau'}</p>
-        <button type='button' onClick={join} className='btn-ghost text-xs'>
+        <button type='button' onClick={handleJoin} className='btn-ghost text-xs'>
           Réessayer
         </button>
       </div>
@@ -212,7 +256,7 @@ export const LiveSessionPanel = ({ room }: Props) => {
           <motion.button
             type='button'
             whileTap={{ scale: 0.95 }}
-            onClick={leave}
+            onClick={handleLeave}
             className='inline-flex h-12 items-center gap-2 rounded-full bg-rose-500/20 px-5 text-sm text-rose-100 ring-1 ring-rose-400/40 hover:bg-rose-500/30'
           >
             <PhoneOff className='h-4 w-4' />

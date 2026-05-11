@@ -1,21 +1,31 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 
 // =====================================================================
 // useRoomLobby
 //
-// Observe en lecture seule les participants actuellement dans le live audio
-// d'une room. Subscribe au même canal Realtime que le mesh WebRTC
-// ("halaqa:{roomId}") SANS tracker sa propre présence — sert uniquement à
-// afficher "X est en live, rejoindre ?" aux membres qui ne sont pas encore
-// connectés.
+// Canal Realtime dédié à signaler "qui est actuellement en live audio"
+// dans une room. Séparé du canal WebRTC (halaqa:{roomId}) pour éviter
+// tout conflit entre instances de canal sur le même navigateur.
+//
+// Topologie :
+//   - halaqa-lobby:{roomId}  → présence des participants en live
+//   - halaqa:{roomId}        → signaling WebRTC (offers/answers/ICE)
+//
+// Tous les membres de la room qui ouvrent la page subscribe au lobby
+// en lecture. Quand un membre démarre/rejoint le live, il appelle
+// announce(userId). À la sortie, il appelle unannounce().
 // =====================================================================
+
+const log = (...args: unknown[]) => console.info('[Lobby]', ...args)
 
 export const useRoomLobby = (roomId: string | null) => {
   const [liveUserIds, setLiveUserIds] = useState<Set<string>>(new Set())
   const [ready, setReady] = useState(false)
+  const channelRef = useRef<RealtimeChannel | null>(null)
 
   useEffect(() => {
     if (!roomId) {
@@ -26,7 +36,8 @@ export const useRoomLobby = (roomId: string | null) => {
 
     setReady(false)
     const sb = supabase()
-    const channel = sb.channel(`halaqa:${roomId}`, {
+    const channelName = `halaqa-lobby:${roomId}`
+    const channel = sb.channel(channelName, {
       config: {
         broadcast: { self: false, ack: false },
       },
@@ -39,6 +50,7 @@ export const useRoomLobby = (roomId: string | null) => {
         const uid = presences[0]?.user_id
         if (uid) ids.add(uid)
       })
+      log('Presence update — liveUserIds:', Array.from(ids))
       setLiveUserIds(ids)
     }
 
@@ -47,16 +59,40 @@ export const useRoomLobby = (roomId: string | null) => {
       .on('presence', { event: 'join' }, updateState)
       .on('presence', { event: 'leave' }, updateState)
       .subscribe(status => {
+        log(`Subscribe status on ${channelName}:`, status)
         if (status === 'SUBSCRIBED') {
           setReady(true)
           updateState()
         }
       })
 
+    channelRef.current = channel
+
     return () => {
+      log('Removing lobby channel', channelName)
       sb.removeChannel(channel)
+      channelRef.current = null
     }
   }, [roomId])
 
-  return { liveUserIds, ready }
+  const announce = useCallback(async (userId: string) => {
+    const ch = channelRef.current
+    if (!ch) {
+      log('announce(): channel not ready')
+      return
+    }
+    log('announce()', userId)
+    await ch.track({ user_id: userId, started_at: Date.now() })
+  }, [])
+
+  const unannounce = useCallback(async () => {
+    const ch = channelRef.current
+    if (!ch) return
+    log('unannounce()')
+    try {
+      await ch.untrack()
+    } catch {}
+  }, [])
+
+  return { liveUserIds, ready, announce, unannounce }
 }
