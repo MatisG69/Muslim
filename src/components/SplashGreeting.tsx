@@ -17,28 +17,28 @@ const firstName = (raw: string | null | undefined): string => {
 }
 
 export const SplashGreeting = () => {
-  const { user, loading: authLoading, configured } = useAuth()
-  const [visible, setVisible] = useState(false)
+  // Visible par défaut dès le rendu serveur. Le script inline du <head>
+  // ajoute la classe `splash-skip` au <html> si le splash a déjà été vu
+  // dans cette session, ce qui le masque via CSS avant tout paint.
+  const [visible, setVisible] = useState(true)
   const [exiting, setExiting] = useState(false)
   const [profileName, setProfileName] = useState<string | null>(null)
 
-  // Décide si on affiche le splash : seulement une fois par session.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (authLoading) return
-    try {
-      const shown = sessionStorage.getItem(SESSION_KEY) === '1'
-      if (shown) return
-      sessionStorage.setItem(SESSION_KEY, '1')
-      setVisible(true)
-    } catch {
-      setVisible(true)
-    }
-  }, [authLoading])
+  const { user, configured } = useAuth()
 
-  // Récupère le display_name du profil halaqa si disponible
+  // Marque la session comme "splash déjà vu" dès le mount + planifie le fade-out
   useEffect(() => {
-    if (!visible || !user || !configured) return
+    try {
+      sessionStorage.setItem(SESSION_KEY, '1')
+    } catch {}
+
+    const id = window.setTimeout(() => setExiting(true), HOLD_MS)
+    return () => window.clearTimeout(id)
+  }, [])
+
+  // Récupère le display_name du profil halaqa en arrière-plan
+  useEffect(() => {
+    if (!user || !configured) return
     let cancelled = false
     getProfile(user.id)
       .then(p => {
@@ -48,14 +48,7 @@ export const SplashGreeting = () => {
     return () => {
       cancelled = true
     }
-  }, [visible, user, configured])
-
-  // Auto-dismiss après HOLD_MS
-  useEffect(() => {
-    if (!visible || exiting) return
-    const id = window.setTimeout(() => setExiting(true), HOLD_MS)
-    return () => window.clearTimeout(id)
-  }, [visible, exiting])
+  }, [user, configured])
 
   const displayedName = useMemo(() => {
     return firstName(profileName) || firstName(user?.email?.split('@')[0]) || ''
@@ -73,6 +66,7 @@ export const SplashGreeting = () => {
       {!exiting && (
         <motion.div
           key='splash'
+          data-splash
           role='dialog'
           aria-label='Bienvenue'
           initial={{ opacity: 1 }}
@@ -196,7 +190,6 @@ export const SplashGreeting = () => {
 const Ornament = () => (
   <svg viewBox='0 0 64 64' className='h-full w-full text-gold-300'>
     <g fill='none' stroke='currentColor' strokeWidth='1' strokeLinecap='round'>
-      {/* 8-branche étoile minimale */}
       {Array.from({ length: 8 }).map((_, i) => {
         const angle = (i * Math.PI) / 4
         const x1 = 32 + Math.cos(angle) * 10

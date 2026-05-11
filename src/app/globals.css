@@ -207,6 +207,11 @@ body {
   animation: breathe 2.5s ease-in-out infinite;
 }
 
+/* Skipper le splash sur les visites subséquentes (script inline pré-React) */
+html.splash-skip [data-splash] {
+  display: none !important;
+}
+
 ::selection {
   background: rgba(212, 169, 87, 0.3);
   color: var(--ivory);

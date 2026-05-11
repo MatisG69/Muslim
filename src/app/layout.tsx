@@ -47,6 +47,13 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang='fr' className={`${cormorant.variable} ${inter.variable} ${amiri.variable}`}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(sessionStorage.getItem('sajda.splash.shown')==='1'){document.documentElement.classList.add('splash-skip')}}catch(_){}`,
+          }}
+        />
+      </head>
       <body>
         <div className='relative min-h-dvh'>
           <div
