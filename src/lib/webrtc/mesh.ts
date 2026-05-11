@@ -15,6 +15,9 @@ import { PEER_CONFIG } from './ice'
 // - Échanges SDP + ICE via broadcast events sur le canal
 // =====================================================================
 
+const log = (...args: unknown[]) => console.info('[Halaqa]', ...args)
+const warn = (...args: unknown[]) => console.warn('[Halaqa]', ...args)
+
 export type PeerState = 'connecting' | 'connected' | 'failed' | 'closed'
 
 export type PeerInfo = {
@@ -117,10 +120,14 @@ export class WebRTCMesh {
       })
     })
 
+    log('Joining channel', `halaqa:${this.roomId}`, 'as', this.localUserId)
+
     await new Promise<void>((resolve, reject) => {
       channel.subscribe(async status => {
+        log('Channel status:', status)
         if (status === 'SUBSCRIBED') {
-          await channel.track({ user_id: this.localUserId, joined_at: Date.now() })
+          const trackResult = await channel.track({ user_id: this.localUserId, joined_at: Date.now() })
+          log('Tracked presence, result:', trackResult)
           resolve()
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           reject(new Error(`Subscribe failed: ${status}`))
@@ -138,14 +145,22 @@ export class WebRTCMesh {
       if (userId !== this.localUserId) remoteUserIds.add(userId)
     })
 
+    log('Presence sync — all keys:', Object.keys(state), 'remote peers:', Array.from(remoteUserIds))
+
     // Crée les PC manquantes
     remoteUserIds.forEach(uid => {
-      if (!this.peers.has(uid)) this.createPeer(uid)
+      if (!this.peers.has(uid)) {
+        log('New peer detected, creating connection:', uid)
+        this.createPeer(uid)
+      }
     })
 
     // Supprime les peers qui ne sont plus présents
     Array.from(this.peers.keys()).forEach(uid => {
-      if (!remoteUserIds.has(uid)) this.closePeer(uid)
+      if (!remoteUserIds.has(uid)) {
+        log('Peer left presence, closing:', uid)
+        this.closePeer(uid)
+      }
     })
 
     this.notifyPeers()
@@ -191,13 +206,23 @@ export class WebRTCMesh {
       this.notifyPeers()
     }
 
+    pc.oniceconnectionstatechange = () => {
+      log(`ICE state [${remoteUserId.slice(0, 8)}]:`, pc.iceConnectionState)
+    }
+
+    pc.onicegatheringstatechange = () => {
+      log(`ICE gathering [${remoteUserId.slice(0, 8)}]:`, pc.iceGatheringState)
+    }
+
     pc.onconnectionstatechange = () => {
+      log(`PC state [${remoteUserId.slice(0, 8)}]:`, pc.connectionState)
       switch (pc.connectionState) {
         case 'connected':
           info.state = 'connected'
           break
         case 'failed':
           info.state = 'failed'
+          warn(`Peer ${remoteUserId} connection FAILED. Probable cause: NAT symétrique. TURN server requis ou indisponible.`)
           break
         case 'closed':
           info.state = 'closed'
@@ -210,10 +235,13 @@ export class WebRTCMesh {
 
     // Politique d'initiation : le userId lexicographiquement plus petit lance l'offer.
     if (this.localUserId < remoteUserId) {
+      log(`I'm initiator (${this.localUserId.slice(0, 8)} < ${remoteUserId.slice(0, 8)}), creating offer`)
       this.makeOffer(remoteUserId).catch(err => {
-        console.error('[WebRTCMesh] makeOffer error', err)
+        console.error('[Halaqa] makeOffer error', err)
         this.emit('error', err as Error)
       })
+    } else {
+      log(`I'm responder (${this.localUserId.slice(0, 8)} > ${remoteUserId.slice(0, 8)}), waiting for offer`)
     }
   }
 
@@ -232,6 +260,7 @@ export class WebRTCMesh {
 
   private async handleSignal(signal: SignalPayload) {
     if ('to' in signal && signal.to !== this.localUserId) return
+    log('Received signal:', signal.type, 'from', signal.from.slice(0, 8))
     if (signal.type === 'leave') {
       this.closePeer(signal.from)
       this.notifyPeers()

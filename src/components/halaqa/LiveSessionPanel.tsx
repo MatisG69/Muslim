@@ -105,6 +105,26 @@ export const LiveSessionPanel = ({ room }: Props) => {
           </AnimatePresence>
         </div>
 
+        {peers.size === 0 && (
+          <div className='rounded-2xl bg-white/[0.03] px-4 py-3 text-center ring-1 ring-white/[0.06]'>
+            <p className='text-xs text-ivory-100/60'>
+              En attente d&apos;un autre participant…
+            </p>
+            <p className='mt-1 text-[10px] text-ivory-100/40'>
+              Demande à un membre de la halaqa de cliquer sur « Démarrer le live ».
+            </p>
+          </div>
+        )}
+
+        {Array.from(peers.values()).some(p => p.state === 'failed') && (
+          <div className='rounded-2xl bg-rose-500/10 px-4 py-3 ring-1 ring-rose-400/30'>
+            <p className='text-xs text-rose-200'>Connexion échouée avec un participant.</p>
+            <p className='mt-1 text-[10px] text-rose-200/70'>
+              Probable NAT symétrique (4G/5G ou réseau restrictif). Réessayer en wifi ou via un autre réseau.
+            </p>
+          </div>
+        )}
+
         <div className='flex items-center justify-center gap-3 pt-2'>
           <motion.button
             type='button'
