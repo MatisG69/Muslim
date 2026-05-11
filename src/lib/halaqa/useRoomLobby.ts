@@ -1,31 +1,26 @@
 'use client'
 
-import type { RealtimeChannel } from '@supabase/supabase-js'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 
 // =====================================================================
 // useRoomLobby
 //
-// Canal Realtime dédié à signaler "qui est actuellement en live audio"
-// dans une room. Séparé du canal WebRTC (halaqa:{roomId}) pour éviter
-// tout conflit entre instances de canal sur le même navigateur.
+// Source de vérité = table room_sessions filtrée par room.
+// Un user est "live" si une de ses room_sessions a ended_at IS NULL et
+// started_at récent (< STALE_MS). Le mesh WebRTC alimente cette table
+// via startSession/endSession + heartbeat.
 //
-// Topologie :
-//   - halaqa-lobby:{roomId}  → présence des participants en live
-//   - halaqa:{roomId}        → signaling WebRTC (offers/answers/ICE)
-//
-// Tous les membres de la room qui ouvrent la page subscribe au lobby
-// en lecture. Quand un membre démarre/rejoint le live, il appelle
-// announce(userId). À la sortie, il appelle unannounce().
+// Avantage vs presence Realtime : DB-backed, RLS-protected, fiable même
+// quand la propagation presence est bridée par la config Supabase.
 // =====================================================================
 
 const log = (...args: unknown[]) => console.info('[Lobby]', ...args)
+const STALE_MS = 120_000 // 2 min — passé ce délai sans heartbeat, on considère orphan
 
 export const useRoomLobby = (roomId: string | null) => {
   const [liveUserIds, setLiveUserIds] = useState<Set<string>>(new Set())
   const [ready, setReady] = useState(false)
-  const channelRef = useRef<RealtimeChannel | null>(null)
 
   useEffect(() => {
     if (!roomId) {
@@ -34,65 +29,64 @@ export const useRoomLobby = (roomId: string | null) => {
       return
     }
 
-    setReady(false)
     const sb = supabase()
-    const channelName = `halaqa-lobby:${roomId}`
-    const channel = sb.channel(channelName, {
-      config: {
-        broadcast: { self: false, ack: false },
-      },
-    })
+    let cancelled = false
 
-    const updateState = () => {
-      const state = channel.presenceState<{ user_id?: string }>()
-      const ids = new Set<string>()
-      Object.values(state).forEach(presences => {
-        const uid = presences[0]?.user_id
-        if (uid) ids.add(uid)
-      })
-      log('Presence update — liveUserIds:', Array.from(ids))
+    const refresh = async () => {
+      const cutoff = new Date(Date.now() - STALE_MS).toISOString()
+      const { data, error } = await sb
+        .from('room_sessions')
+        .select('started_by, started_at, ended_at')
+        .eq('room_id', roomId)
+        .is('ended_at', null)
+        .gte('started_at', cutoff)
+
+      if (cancelled) return
+      if (error) {
+        log('refresh error', error.message)
+        return
+      }
+
+      const ids = new Set<string>((data ?? []).map(r => r.started_by as string))
+      log('refresh — liveUserIds:', Array.from(ids))
       setLiveUserIds(ids)
     }
 
-    channel
-      .on('presence', { event: 'sync' }, updateState)
-      .on('presence', { event: 'join' }, updateState)
-      .on('presence', { event: 'leave' }, updateState)
-      .subscribe(status => {
-        log(`Subscribe status on ${channelName}:`, status)
-        if (status === 'SUBSCRIBED') {
-          setReady(true)
-          updateState()
-        }
-      })
+    refresh().finally(() => {
+      if (!cancelled) setReady(true)
+    })
 
-    channelRef.current = channel
+    const channelName = `lobby-sessions:${roomId}`
+    const channel = sb
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'room_sessions',
+          filter: `room_id=eq.${roomId}`,
+        },
+        payload => {
+          log('postgres_changes', payload.eventType)
+          refresh()
+        },
+      )
+      .subscribe(status => log(`Subscribe ${channelName}:`, status))
+
+    // Poll de secours : revalide toutes les 30s pour expirer les orphelins
+    const pollId = window.setInterval(refresh, 30_000)
 
     return () => {
-      log('Removing lobby channel', channelName)
+      cancelled = true
+      window.clearInterval(pollId)
       sb.removeChannel(channel)
-      channelRef.current = null
     }
   }, [roomId])
 
-  const announce = useCallback(async (userId: string) => {
-    const ch = channelRef.current
-    if (!ch) {
-      log('announce(): channel not ready')
-      return
-    }
-    log('announce()', userId)
-    await ch.track({ user_id: userId, started_at: Date.now() })
-  }, [])
-
-  const unannounce = useCallback(async () => {
-    const ch = channelRef.current
-    if (!ch) return
-    log('unannounce()')
-    try {
-      await ch.untrack()
-    } catch {}
-  }, [])
+  // Stubs (l'API reste compatible avec l'ancien LiveSessionPanel)
+  const announce = useCallback(async () => {}, [])
+  const unannounce = useCallback(async () => {}, [])
 
   return { liveUserIds, ready, announce, unannounce }
 }

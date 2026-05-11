@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic, MicOff, PhoneIncoming, PhoneOff, Radio } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useAuth } from '@/lib/auth/AuthContext'
 import { useRoomLobby } from '@/lib/halaqa/useRoomLobby'
 import { useWebRTCRoom } from '@/lib/halaqa/useWebRTCRoom'
@@ -18,46 +18,21 @@ export const LiveSessionPanel = ({ room }: Props) => {
   const { user } = useAuth()
   const { liveState, peers, muted, error, join, leave, toggleMute, localStream } =
     useWebRTCRoom(room.id)
-  const { liveUserIds, announce, unannounce } = useRoomLobby(room.id)
-  const announcedRef = useRef(false)
+  const { liveUserIds } = useRoomLobby(room.id)
 
+  // Wrappers minimaux — useWebRTCRoom gère lui-même la table room_sessions
+  // qui est observée par useRoomLobby (postgres_changes).
   const handleJoin = useCallback(async () => {
     try {
       await join()
-      if (user?.id) {
-        await announce(user.id)
-        announcedRef.current = true
-      }
     } catch {
       // erreur déjà gérée dans useWebRTCRoom
     }
-  }, [join, announce, user?.id])
+  }, [join])
 
   const handleLeave = useCallback(async () => {
-    if (announcedRef.current) {
-      await unannounce()
-      announcedRef.current = false
-    }
     await leave()
-  }, [leave, unannounce])
-
-  // Si le mesh tombe en erreur, libérer l'annonce
-  useEffect(() => {
-    if (liveState === 'error' && announcedRef.current) {
-      unannounce()
-      announcedRef.current = false
-    }
-  }, [liveState, unannounce])
-
-  // Au démontage du composant : libérer l'annonce
-  useEffect(() => {
-    return () => {
-      if (announcedRef.current) {
-        unannounce()
-        announcedRef.current = false
-      }
-    }
-  }, [unannounce])
+  }, [leave])
 
   const memberMap = useMemo(() => {
     const map = new Map<string, RoomWithMembers['members'][number]['profile']>()
