@@ -41,18 +41,13 @@ export const LiveSessionPanel = ({ room }: Props) => {
     await leave()
   }, [leave, unannounce])
 
-  // Si le mesh change d'état (ex. erreur), synchronise l'annonce lobby
+  // Si le mesh tombe en erreur, libérer l'annonce
   useEffect(() => {
-    if (liveState === 'live' && !announcedRef.current && user?.id) {
-      announce(user.id).then(() => {
-        announcedRef.current = true
-      })
-    }
-    if (liveState === 'idle' && announcedRef.current) {
+    if (liveState === 'error' && announcedRef.current) {
       unannounce()
       announcedRef.current = false
     }
-  }, [liveState, user?.id, announce, unannounce])
+  }, [liveState, unannounce])
 
   // Au démontage du composant : libérer l'annonce
   useEffect(() => {

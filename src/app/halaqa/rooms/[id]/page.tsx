@@ -43,7 +43,11 @@ export default function RoomDetailPage() {
     [accepted, memberIds],
   )
 
-  if (authLoading || roomLoading) {
+  // Important : on n'affiche le placeholder de chargement QUE si on n'a pas
+  // encore de room en cache. Un refresh en arrière-plan (via les subscriptions
+  // Realtime de useRoom) ne doit jamais démonter LiveSessionPanel, sinon le
+  // mesh WebRTC + le lobby sont détruits et reconstruits à chaque event DB.
+  if ((authLoading || roomLoading) && !room) {
     return (
       <PageShell>
         <p className='py-10 text-center text-xs text-ivory-100/40'>Chargement…</p>
