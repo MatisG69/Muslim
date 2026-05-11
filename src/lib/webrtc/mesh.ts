@@ -138,10 +138,12 @@ export class WebRTCMesh {
 
   private handlePresenceSync() {
     if (!this.channel) return
-    const state = this.channel.presenceState<{ user_id: string }>()
+    const state = this.channel.presenceState<{ user_id?: string }>()
     const remoteUserIds = new Set<string>()
-    Object.entries(state).forEach(([key, presences]) => {
-      const userId = presences[0]?.user_id ?? key
+    Object.values(state).forEach(presences => {
+      const userId = presences[0]?.user_id
+      // Ignore les présences sans user_id (observateurs lobby, etc.)
+      if (!userId) return
       if (userId !== this.localUserId) remoteUserIds.add(userId)
     })
 

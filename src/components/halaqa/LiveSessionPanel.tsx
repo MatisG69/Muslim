@@ -1,9 +1,10 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, PhoneOff, Radio } from 'lucide-react'
+import { Mic, MicOff, PhoneIncoming, PhoneOff, Radio } from 'lucide-react'
 import { useMemo } from 'react'
 import { useAuth } from '@/lib/auth/AuthContext'
+import { useRoomLobby } from '@/lib/halaqa/useRoomLobby'
 import { useWebRTCRoom } from '@/lib/halaqa/useWebRTCRoom'
 import type { PeerInfo } from '@/lib/webrtc/mesh'
 import type { RoomWithMembers } from '@/lib/halaqa/types'
@@ -17,6 +18,7 @@ export const LiveSessionPanel = ({ room }: Props) => {
   const { user } = useAuth()
   const { liveState, peers, muted, error, join, leave, toggleMute, localStream } =
     useWebRTCRoom(room.id)
+  const { liveUserIds } = useRoomLobby(room.id)
 
   const memberMap = useMemo(() => {
     const map = new Map<string, RoomWithMembers['members'][number]['profile']>()
@@ -32,7 +34,75 @@ export const LiveSessionPanel = ({ room }: Props) => {
     muted,
   }
 
+  // Autres participants déjà en live (excluant moi-même quand je suis idle/connecting)
+  const otherLiveProfiles = useMemo(() => {
+    return Array.from(liveUserIds)
+      .filter(uid => uid !== user?.id)
+      .map(uid => ({ userId: uid, profile: memberMap.get(uid) ?? null }))
+  }, [liveUserIds, user?.id, memberMap])
+
+  const someoneElseIsLive = otherLiveProfiles.length > 0
+
   if (liveState === 'idle') {
+    if (someoneElseIsLive) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className='card relative overflow-hidden px-5 py-6'
+        >
+          <div
+            className='pointer-events-none absolute inset-0 opacity-[0.06]'
+            style={{ backgroundImage: 'url(/patterns/arabesque.svg)', backgroundSize: '160px' }}
+            aria-hidden
+          />
+          <div className='relative flex flex-col items-center gap-4 text-center'>
+            <div className='relative'>
+              <motion.span
+                animate={{ scale: [1, 1.25, 1], opacity: [0.4, 0, 0.4] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className='absolute -inset-3 rounded-full bg-emerald-500/30'
+                aria-hidden
+              />
+              <motion.span
+                animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0, 0.3] }}
+                transition={{ duration: 2, repeat: Infinity, delay: 0.4 }}
+                className='absolute -inset-3 rounded-full bg-emerald-500/20'
+                aria-hidden
+              />
+              <span className='relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-emerald-500/30 to-emerald-700/40 ring-2 ring-emerald-400/50'>
+                <PhoneIncoming className='h-5 w-5 text-emerald-100' />
+              </span>
+            </div>
+
+            <div>
+              <p className='text-[10px] uppercase tracking-[0.35em] text-emerald-200/80'>
+                Live en cours
+              </p>
+              <p className='mt-1 font-serif text-xl text-ivory-50'>
+                {otherLiveProfiles.length === 1
+                  ? `${otherLiveProfiles[0].profile?.display_name ?? 'Un membre'} est en ligne`
+                  : `${otherLiveProfiles.length} membres sont en ligne`}
+              </p>
+              {otherLiveProfiles.length > 1 && (
+                <p className='mt-0.5 max-w-xs text-[11px] text-ivory-100/50'>
+                  {otherLiveProfiles
+                    .map(p => p.profile?.display_name ?? '—')
+                    .join(' · ')}
+                </p>
+              )}
+            </div>
+
+            <button type='button' onClick={join} className='btn-primary text-sm'>
+              <PhoneIncoming className='h-4 w-4' />
+              Rejoindre le live
+            </button>
+          </div>
+        </motion.div>
+      )
+    }
+
     return (
       <div className='card flex flex-col items-center gap-4 px-6 py-8 text-center'>
         <span className='inline-flex h-12 w-12 items-center justify-center rounded-full bg-gold-400/15 ring-1 ring-gold-400/40'>
@@ -41,7 +111,7 @@ export const LiveSessionPanel = ({ room }: Props) => {
         <div>
           <h3 className='font-serif text-xl text-ivory-50'>Session live</h3>
           <p className='mt-1 text-xs text-ivory-100/60'>
-            Rejoins la halaqa en direct pour réciter ou échanger.
+            Démarre la halaqa en direct. Les autres membres recevront une invitation à rejoindre.
           </p>
         </div>
         <button type='button' onClick={join} className='btn-primary text-sm'>
