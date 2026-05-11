@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { BellRing, BookOpen, CalendarCheck, Circle, Compass, Droplets, Lock, MapPin, Mic, User, Volume2 } from 'lucide-react'
+import { BellRing, BookOpen, CalendarCheck, Circle, Compass, Droplets, Lock, MapPin, Mic, User, Users, Volume2 } from 'lucide-react'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { AlarmOverlay } from '@/components/AlarmOverlay'
@@ -291,6 +291,26 @@ export default function Home() {
             <p className='font-serif text-lg text-ivory-50'>Ablutions</p>
             <p className='text-[11px] text-ivory-100/50'>Guide étape par étape</p>
           </div>
+        </Link>
+        <Link
+          href='/halaqa'
+          className='card group relative col-span-2 flex items-center gap-4 overflow-hidden px-5 py-4 transition-colors hover:bg-white/[0.04]'
+        >
+          <div
+            className='pointer-events-none absolute inset-0 opacity-[0.05] transition-opacity group-hover:opacity-[0.07]'
+            style={{ backgroundImage: 'url(/patterns/arabesque.svg)', backgroundSize: '160px' }}
+            aria-hidden
+          />
+          <div className='relative flex h-10 w-10 items-center justify-center rounded-full bg-gold-400/10 ring-1 ring-gold-400/40'>
+            <Users className='h-4 w-4 text-gold-300' />
+          </div>
+          <div className='relative flex-1'>
+            <p className='font-serif text-lg text-ivory-50'>Halaqa avec mes amis</p>
+            <p className='text-[11px] text-ivory-100/55'>
+              Récitez ensemble, partagez un rappel ou une histoire
+            </p>
+          </div>
+          <span className='relative text-gold-300'>→</span>
         </Link>
         <Link href='/planner' className='card group col-span-2 flex items-center gap-4 px-5 py-4 transition-colors hover:bg-white/[0.04]'>
           <div className='flex h-10 w-10 items-center justify-center rounded-full bg-gold-400/10 ring-1 ring-gold-400/30'>

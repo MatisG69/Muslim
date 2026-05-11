@@ -1,6 +1,6 @@
 'use client'
 
-import { BookOpen, CalendarDays, Circle, Compass, Home, Settings } from 'lucide-react'
+import { BookOpen, CalendarDays, Circle, Compass, Home, Settings, Users } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -12,6 +12,7 @@ type Item = {
 
 const ITEMS: Item[] = [
   { href: '/', label: 'Accueil', icon: Home },
+  { href: '/halaqa', label: 'Halaqa', icon: Users },
   { href: '/quran', label: 'Coran', icon: BookOpen },
   { href: '/qibla', label: 'Qibla', icon: Compass },
   { href: '/tasbih', label: 'Tasbih', icon: Circle },
